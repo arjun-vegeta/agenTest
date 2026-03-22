@@ -459,3 +459,10 @@ export interface LlmTreeNode {
   actions?: string[];
   children?: LlmTreeNode[];
 }
+
+// ---------------------------------------------------------------------------
+// Platforms
+// ---------------------------------------------------------------------------
+
+export type Platform = 'android' | 'ios';
+
