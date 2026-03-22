@@ -83,3 +83,21 @@ export class GrpcRpcError extends AgenTestError {
     this.name = 'GrpcRpcError';
   }
 }
+
+export class SimctlConnectionError extends AgenTestError {
+  constructor(message: string) {
+    super(message, 'SIMCTL_CONNECTION_ERROR');
+    this.name = 'SimctlConnectionError';
+  }
+}
+
+export class SimctlCommandError extends AgenTestError {
+  constructor(
+    message: string,
+    public readonly command: string,
+  ) {
+    super(message, 'SIMCTL_COMMAND_ERROR');
+    this.name = 'SimctlCommandError';
+  }
+}
+
