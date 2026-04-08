@@ -1,4 +1,4 @@
-import { DIFF_THRESHOLDS, TIMEOUTS } from '../constants.js';
+import { DIFF_THRESHOLDS, IDLE_LOADING, LOADING_INDICATORS, TIMEOUTS } from '../constants.js';
 import { IdleTimeoutError } from '../errors.js';
 import type { UnifiedUINode } from '../types.js';
 import type { AdbClient } from './adb.js';
@@ -15,32 +15,54 @@ export interface IdleOptions {
   pollIntervalMs: number;
   /** Consecutive stable snapshots required */
   requiredStableCount: number;
+  /** Whether to wait for loading indicators to disappear after tree stabilizes */
+  waitForLoadingIndicators: boolean;
+  /** Max extra time to wait for loading indicators (ms) */
+  maxLoadingWaitMs: number;
 }
 
 const DEFAULT_IDLE_OPTIONS: IdleOptions = {
   timeoutMs: TIMEOUTS.IDLE_DETECTION_MS,
   pollIntervalMs: TIMEOUTS.IDLE_POLL_INTERVAL_MS,
   requiredStableCount: TIMEOUTS.IDLE_STABLE_COUNT,
+  waitForLoadingIndicators: true,
+  maxLoadingWaitMs: IDLE_LOADING.MAX_LOADING_WAIT_MS,
 };
+
+// ---------------------------------------------------------------------------
+// Result type — tells callers what happened during idle detection
+// ---------------------------------------------------------------------------
+
+export interface IdleResult {
+  tree: UnifiedUINode;
+  /** Whether loading indicators were detected and waited out */
+  loadingDetected: boolean;
+  /** Description of what loading indicators were found (if any) */
+  loadingDescription?: string;
+}
 
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
 /**
- * Poll the UI tree until it stabilizes (two consecutive snapshots match).
- * Returns the stable tree. Throws IdleTimeoutError if timeout is exceeded.
+ * Poll the UI tree until it stabilizes AND loading indicators disappear.
+ *
+ * Phase 1: Poll until tree fingerprint is stable (2 consecutive matches).
+ * Phase 2: If stable tree contains loading indicators (ProgressBar, shimmer, etc.),
+ *          keep polling until they disappear or maxLoadingWaitMs is exceeded.
  */
 export async function waitForIdle(
   adb: AdbClient,
   options?: Partial<IdleOptions>,
-): Promise<UnifiedUINode> {
+): Promise<IdleResult> {
   const opts = { ...DEFAULT_IDLE_OPTIONS, ...options };
   const startTime = Date.now();
   let previousFingerprint: string | null = null;
   let stableCount = 0;
   let lastTree: UnifiedUINode | null = null;
 
+  // Phase 1: Wait for tree to stabilize
   while (Date.now() - startTime < opts.timeoutMs) {
     const xml = await adb.dumpUiTree();
     const tree = parseUiAutomatorXml(xml);
@@ -49,7 +71,8 @@ export async function waitForIdle(
     if (previousFingerprint !== null && fingerprint === previousFingerprint) {
       stableCount++;
       if (stableCount >= opts.requiredStableCount) {
-        return tree;
+        lastTree = tree;
+        break;
       }
     } else {
       stableCount = 0;
@@ -60,22 +83,128 @@ export async function waitForIdle(
     await sleep(opts.pollIntervalMs);
   }
 
-  // Timeout — return whatever we have rather than crashing,
-  // but warn via the error that we didn't fully stabilize
-  if (lastTree) {
-    return lastTree;
+  if (!lastTree) {
+    throw new IdleTimeoutError(opts.timeoutMs);
   }
 
-  throw new IdleTimeoutError(opts.timeoutMs);
+  // Phase 2: If loading indicators present, wait for them to disappear
+  if (opts.waitForLoadingIndicators) {
+    const loadingResult = await waitForLoadingToFinish(adb, lastTree, opts);
+    return loadingResult;
+  }
+
+  return { tree: lastTree, loadingDetected: false };
 }
 
 /**
  * Take a single snapshot without waiting for idle.
- * Useful when you just need the current state.
  */
 export async function snapshotTree(adb: AdbClient): Promise<UnifiedUINode> {
   const xml = await adb.dumpUiTree();
   return parseUiAutomatorXml(xml);
+}
+
+// ---------------------------------------------------------------------------
+// Loading indicator detection
+// ---------------------------------------------------------------------------
+
+/**
+ * Check if a tree contains any loading indicators (spinners, progress bars,
+ * shimmer layouts, skeleton screens, "loading..." text).
+ */
+export function detectLoadingIndicators(root: UnifiedUINode): string[] {
+  const found: string[] = [];
+  collectLoadingIndicators(root, found);
+  return found;
+}
+
+function collectLoadingIndicators(node: UnifiedUINode, results: string[]): void {
+  // Check class name exact match
+  if (LOADING_INDICATORS.CLASS_NAMES.includes(node.className)) {
+    results.push(`${node.className} at [${node.bounds.left},${node.bounds.top}]`);
+  }
+
+  // Check class name fragments
+  if (
+    !LOADING_INDICATORS.CLASS_NAMES.includes(node.className) &&
+    LOADING_INDICATORS.CLASS_FRAGMENTS.some((f) => node.className.includes(f))
+  ) {
+    results.push(`${node.className} at [${node.bounds.left},${node.bounds.top}]`);
+  }
+
+  // Check text patterns
+  if (node.text) {
+    for (const pattern of LOADING_INDICATORS.TEXT_PATTERNS) {
+      if (pattern.test(node.text)) {
+        results.push(`text "${node.text}" at [${node.bounds.left},${node.bounds.top}]`);
+        break;
+      }
+    }
+  }
+
+  // Check description patterns
+  if (node.description) {
+    for (const pattern of LOADING_INDICATORS.DESC_PATTERNS) {
+      if (pattern.test(node.description)) {
+        results.push(`desc "${node.description}" at [${node.bounds.left},${node.bounds.top}]`);
+        break;
+      }
+    }
+  }
+
+  for (const child of node.children) {
+    collectLoadingIndicators(child, results);
+  }
+}
+
+/**
+ * After tree stabilizes, if loading indicators are present, keep polling
+ * until they disappear or timeout.
+ */
+async function waitForLoadingToFinish(
+  adb: AdbClient,
+  stableTree: UnifiedUINode,
+  opts: IdleOptions,
+): Promise<IdleResult> {
+  const indicators = detectLoadingIndicators(stableTree);
+
+  if (indicators.length === 0) {
+    return { tree: stableTree, loadingDetected: false };
+  }
+
+  const description = indicators.join(', ');
+  const loadingStartTime = Date.now();
+
+  // Poll until loading indicators disappear
+  while (Date.now() - loadingStartTime < opts.maxLoadingWaitMs) {
+    await sleep(IDLE_LOADING.LOADING_POLL_INTERVAL_MS);
+
+    const xml = await adb.dumpUiTree();
+    const tree = parseUiAutomatorXml(xml);
+    const currentIndicators = detectLoadingIndicators(tree);
+
+    if (currentIndicators.length === 0) {
+      // Loading finished — do one more stability check
+      await sleep(opts.pollIntervalMs);
+      const finalXml = await adb.dumpUiTree();
+      const finalTree = parseUiAutomatorXml(finalXml);
+
+      return {
+        tree: finalTree,
+        loadingDetected: true,
+        loadingDescription: `Waited for: ${description}`,
+      };
+    }
+  }
+
+  // Timeout — loading indicators still present, return whatever we have
+  const xml = await adb.dumpUiTree();
+  const finalTree = parseUiAutomatorXml(xml);
+  return {
+    tree: finalTree,
+    loadingDetected: true,
+    loadingDescription: `Timed out waiting for: ${description}`,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -98,7 +227,6 @@ function computeFingerprint(node: UnifiedUINode): string {
 const TIMESTAMP_PATTERN = /^\d{1,2}:\d{2}(:\d{2})?(\s?(AM|PM|am|pm))?$/;
 
 function collectFingerprint(node: UnifiedUINode, parts: string[]): void {
-  // Include: role, resource-id, non-noisy text, description, rounded bounds, key state
   parts.push(node.role);
   parts.push(node.resourceId);
 
