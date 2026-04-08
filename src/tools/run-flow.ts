@@ -1,4 +1,4 @@
-import { IDLE_LOADING } from '../constants.js';
+import { IDLE_LOADING, LIGHTWEIGHT_ACTIONS, SYSTEM_PACKAGES } from '../constants.js';
 import { AdbClient } from '../android/adb.js';
 import { snapshotTree, waitForIdle } from '../android/idle.js';
 import { checkAssertion, executeAction } from '../android/input.js';
@@ -10,6 +10,7 @@ import type {
   ShellExecutor,
   StepResult,
   SystemDialog,
+  UnifiedUINode,
 } from '../types.js';
 
 // Default screen bounds (1080x1920) — used for screen-level swipes
@@ -29,6 +30,14 @@ function isScrollToStep(step: ActionStep): boolean {
   return step.action === 'scroll_to';
 }
 
+function detectAppCrash(tree: UnifiedUINode, targetPackage: string): boolean {
+  if (!targetPackage) return false;
+  const currentPackage = tree.packageName;
+  if (currentPackage === targetPackage) return false;
+  // App crashed if root package changed to a system package
+  return SYSTEM_PACKAGES.some((pkg) => currentPackage === pkg);
+}
+
 export async function handleRunFlow(
   shell: ShellExecutor,
   steps: ActionStep[],
@@ -42,6 +51,9 @@ export async function handleRunFlow(
   let currentTree = await snapshotTree(adb);
   const screenBounds: Bounds =
     currentTree.bounds.right > 0 ? currentTree.bounds : DEFAULT_SCREEN_BOUNDS;
+
+  // Capture the target package for crash detection
+  const targetPackage = currentTree.packageName;
 
   // Check for system dialogs on the initial screen
   const initialDialogs = await adb.detectSystemDialogs(currentTree);
@@ -117,11 +129,43 @@ export async function handleRunFlow(
           success: true,
           durationMs: Date.now() - stepStart,
         });
+      } else if (LIGHTWEIGHT_ACTIONS.includes(step.action)) {
+        // Lightweight action — single snapshot, no idle polling (faster)
+        await executeAction(adb, currentTree, step, screenBounds);
+        currentTree = await snapshotTree(adb);
+
+        results.push({
+          stepIndex: i,
+          action: step,
+          success: true,
+          durationMs: Date.now() - stepStart,
+        });
       } else {
-        // Action step — execute then wait for idle (with loading detection)
+        // Heavy action (tap, swipe, etc.) — full idle detection with loading awareness
         await executeAction(adb, currentTree, step, screenBounds);
         const idleResult = await waitForIdle(adb);
         currentTree = idleResult.tree;
+
+        // Check for app crash (root package changed to system package)
+        if (detectAppCrash(currentTree, targetPackage)) {
+          results.push({
+            stepIndex: i,
+            action: step,
+            success: false,
+            durationMs: Date.now() - stepStart,
+            error: `App crashed — screen changed to ${currentTree.packageName}`,
+          });
+          return {
+            success: false,
+            stepsCompleted: i,
+            totalSteps: steps.length,
+            results,
+            finalUiTree: serializeTreeForLlm(currentTree),
+            error: `App crashed after step ${i} (${step.action}). Current package: ${currentTree.packageName}`,
+            systemDialogs: detectedDialogs.length > 0 ? detectedDialogs : undefined,
+            appCrashDetected: true,
+          };
+        }
 
         // Check for system dialogs after each action
         const dialogs = await adb.detectSystemDialogs(currentTree);

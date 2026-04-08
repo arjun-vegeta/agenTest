@@ -313,6 +313,8 @@ export interface FlowTrace {
   error?: string;
   /** System dialogs detected during the flow (permission prompts, crash dialogs) */
   systemDialogs?: SystemDialog[];
+  /** True if the app crashed during the flow (root package changed to system package) */
+  appCrashDetected?: boolean;
 }
 
 // ---------------------------------------------------------------------------
