@@ -25,12 +25,12 @@ export async function handleConnect(
   // Launch the app
   await adb.launchApp(packageName);
 
-  // Wait for UI to settle
-  const tree = await waitForIdle(adb);
+  // Wait for UI to settle (with loading indicator detection)
+  const idleResult = await waitForIdle(adb);
 
   return {
     deviceId: resolvedDeviceId,
     packageName,
-    uiTree: serializeTreeForLlm(tree),
+    uiTree: serializeTreeForLlm(idleResult.tree),
   };
 }

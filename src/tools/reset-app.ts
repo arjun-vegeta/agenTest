@@ -21,11 +21,11 @@ export async function handleResetApp(
   // Relaunch
   await adb.launchApp(packageName);
 
-  // Wait for UI to settle
-  const tree = await waitForIdle(adb);
+  // Wait for UI to settle (with loading indicator detection)
+  const idleResult = await waitForIdle(adb);
 
   return {
     packageName,
-    uiTree: serializeTreeForLlm(tree),
+    uiTree: serializeTreeForLlm(idleResult.tree),
   };
 }

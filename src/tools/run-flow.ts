@@ -1,3 +1,4 @@
+import { IDLE_LOADING } from '../constants.js';
 import { AdbClient } from '../android/adb.js';
 import { snapshotTree, waitForIdle } from '../android/idle.js';
 import { checkAssertion, executeAction } from '../android/input.js';
@@ -78,14 +79,32 @@ export async function handleRunFlow(
           };
         }
       } else if (step.action === 'wait') {
-        // Wait steps just sleep — no tree interaction needed
+        // Wait steps sleep then re-snapshot the tree so finalUiTree reflects post-wait state
         await executeAction(adb, currentTree, step, screenBounds);
+        currentTree = await snapshotTree(adb);
 
         results.push({
           stepIndex: i,
           action: step,
           success: true,
           durationMs: Date.now() - stepStart,
+        });
+      } else if (step.action === 'wait_for_stable') {
+        // Smart wait: polls tree until stable AND loading indicators disappear
+        const timeout = step.timeoutMs ?? IDLE_LOADING.MAX_LOADING_WAIT_MS;
+        const idleResult = await waitForIdle(adb, {
+          timeoutMs: timeout,
+          waitForLoadingIndicators: true,
+          maxLoadingWaitMs: timeout,
+        });
+        currentTree = idleResult.tree;
+
+        results.push({
+          stepIndex: i,
+          action: step,
+          success: true,
+          durationMs: Date.now() - stepStart,
+          loadingDetected: idleResult.loadingDescription,
         });
       } else if (isScrollToStep(step)) {
         // scroll_to handles its own idle/snapshot loop internally
@@ -99,9 +118,10 @@ export async function handleRunFlow(
           durationMs: Date.now() - stepStart,
         });
       } else {
-        // Action step — execute then wait for idle
+        // Action step — execute then wait for idle (with loading detection)
         await executeAction(adb, currentTree, step, screenBounds);
-        currentTree = await waitForIdle(adb);
+        const idleResult = await waitForIdle(adb);
+        currentTree = idleResult.tree;
 
         // Check for system dialogs after each action
         const dialogs = await adb.detectSystemDialogs(currentTree);
@@ -112,6 +132,7 @@ export async function handleRunFlow(
           action: step,
           success: true,
           durationMs: Date.now() - stepStart,
+          loadingDetected: idleResult.loadingDescription,
         });
       }
     } catch (err) {
