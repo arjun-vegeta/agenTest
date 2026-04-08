@@ -99,7 +99,7 @@ export const TIMEOUTS = {
   /** Default timeout for idle detection (ms) */
   IDLE_DETECTION_MS: 10_000,
   /** Polling interval between tree snapshots during idle detection (ms) */
-  IDLE_POLL_INTERVAL_MS: 500,
+  IDLE_POLL_INTERVAL_MS: 200,
   /** Number of consecutive stable snapshots required to declare idle */
   IDLE_STABLE_COUNT: 2,
   /** Default timeout for waiting on a single action (ms) */
@@ -108,6 +108,8 @@ export const TIMEOUTS = {
   SWIPE_DURATION_MS: 300,
   /** Default long press duration (ms) */
   LONG_PRESS_DURATION_MS: 1_000,
+  /** Delay after tapping a text field to let keyboard animate in (ms) */
+  KEYBOARD_SETTLE_MS: 300,
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -142,6 +144,7 @@ export const KEYCODES = {
   DPAD_LEFT: 'KEYCODE_DPAD_LEFT',
   DPAD_RIGHT: 'KEYCODE_DPAD_RIGHT',
   APP_SWITCH: 'KEYCODE_APP_SWITCH',
+  PASTE: 'KEYCODE_PASTE',
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -274,6 +277,20 @@ export const IDLE_LOADING = {
   /** Poll interval when waiting for loading indicators to disappear (ms) */
   LOADING_POLL_INTERVAL_MS: 500,
 } as const;
+
+// ---------------------------------------------------------------------------
+// Lightweight Actions (skip full idle detection — single snapshot only)
+// ---------------------------------------------------------------------------
+
+export const LIGHTWEIGHT_ACTIONS: readonly string[] = [
+  'press_key',
+  'type',
+  'clear_text',
+  'tap_coordinates',
+  'long_press_coordinates',
+  'double_tap_coordinates',
+  'swipe_coordinates',
+] as const;
 
 export const SYSTEM_PACKAGES = [
   'com.android.systemui',
