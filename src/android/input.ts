@@ -94,8 +94,9 @@ export async function executeAction(
 
     case 'type': {
       const element = resolveTarget(tree, step.target);
-      // Tap the field first to focus it
+      // Tap the field first to focus it, then wait for keyboard to appear
       await adb.tap(element.center.x, element.center.y);
+      await sleep(TIMEOUTS.KEYBOARD_SETTLE_MS);
       await adb.type(step.value);
       break;
     }
