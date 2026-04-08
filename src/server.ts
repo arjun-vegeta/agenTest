@@ -1,13 +1,16 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
-import { SERVER_NAME, SERVER_VERSION, TOOL_NAMES } from './constants.js';
+import { LOGCAT, SERVER_NAME, SERVER_VERSION, TOOL_NAMES, TOOL_NAMES_EXT } from './constants.js';
 import { LazyTestError } from './errors.js';
 import { ProcessShellExecutor } from './shell.js';
 import { handleConnect } from './tools/connect.js';
+import { handleDeviceInfo } from './tools/device-info.js';
+import { handleGetLogs } from './tools/get-logs.js';
 import { handleGetUiTree } from './tools/get-ui-tree.js';
 import { handleResetApp } from './tools/reset-app.js';
 import { handleRunFlow } from './tools/run-flow.js';
+import { handleScreenshot } from './tools/screenshot.js';
 import { ActionStepSchema } from './types.js';
 
 // ---------------------------------------------------------------------------
@@ -144,6 +147,92 @@ server.tool(
     try {
       const result = await handleResetApp(shell, pkg, activeDeviceId);
 
+      return {
+        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+      };
+    } catch (err) {
+      return formatError(err);
+    }
+  },
+);
+
+// ---------------------------------------------------------------------------
+// Tool: lazytest_get_logs
+// ---------------------------------------------------------------------------
+
+server.tool(
+  TOOL_NAMES_EXT.GET_LOGS,
+  'Get recent app logs (logcat) filtered to the target app. Use to diagnose failures — API errors, crashes, exceptions.',
+  {
+    packageName: z
+      .string()
+      .optional()
+      .describe('Package name to filter logs for. Defaults to the last connected app.'),
+    maxLines: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe(`Max log lines to return (default: ${LOGCAT.MAX_LINES})`),
+  },
+  async ({ packageName, maxLines }) => {
+    const pkg = packageName ?? activePackageName;
+    if (!pkg) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({
+              error:
+                'No package name provided and no app currently connected. Call lazytest_connect first.',
+            }),
+          },
+        ],
+      };
+    }
+
+    try {
+      const result = await handleGetLogs(shell, pkg, maxLines, activeDeviceId);
+      return {
+        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+      };
+    } catch (err) {
+      return formatError(err);
+    }
+  },
+);
+
+// ---------------------------------------------------------------------------
+// Tool: lazytest_screenshot
+// ---------------------------------------------------------------------------
+
+server.tool(
+  TOOL_NAMES_EXT.SCREENSHOT,
+  'Capture a screenshot of the current screen as a base64-encoded PNG. Use when the accessibility tree is insufficient — custom canvas, images, visual layout issues.',
+  {},
+  async () => {
+    try {
+      const result = await handleScreenshot(shell, activeDeviceId);
+      return {
+        content: [{ type: 'text', text: JSON.stringify(result) }],
+      };
+    } catch (err) {
+      return formatError(err);
+    }
+  },
+);
+
+// ---------------------------------------------------------------------------
+// Tool: lazytest_device_info
+// ---------------------------------------------------------------------------
+
+server.tool(
+  TOOL_NAMES_EXT.DEVICE_INFO,
+  'Get device/emulator info: screen size, density, Android version, SDK level, model. Use to understand the test environment.',
+  {},
+  async () => {
+    try {
+      const result = await handleDeviceInfo(shell, activeDeviceId);
       return {
         content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
       };
