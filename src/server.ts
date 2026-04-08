@@ -92,10 +92,15 @@ server.tool(
 
 server.tool(
   TOOL_NAMES.RUN_FLOW,
-  `Execute a batch of UI actions and assertions sequentially. Stops on first failure.
-Each step is one of: tap, type, swipe, long_press, press_key, wait, assert_visible, assert_not_visible, assert_text_equals, assert_text_contains.
-Target elements using selectors: id (resource-id substring), text (exact), textContains (partial), className, description.
-Returns a full trace with step results and the final UI tree.`,
+  `Execute a batch of UI actions and assertions. Stops on first failure.
+
+CRITICAL: You almost NEVER need "wait" or "wait_for_stable" steps. The server automatically waits after EVERY action for: (1) the UI to settle, (2) all loading spinners, progress bars, shimmers, and skeleton screens to disappear. Just send your actions back-to-back — the server handles all timing and synchronization. Only use "wait" as a last resort if the app has no visible loading indicator but you know it needs time (rare).
+
+ACTIONS: tap, tap_coordinates, type, clear_text, swipe, swipe_coordinates, long_press, long_press_coordinates, double_tap, double_tap_coordinates, press_key, scroll_to.
+ASSERTIONS: assert_visible, assert_not_visible, assert_text_equals, assert_text_contains.
+
+Selectors: id (resource-id substring), text (exact), textContains (partial), className, description, index.
+Use *_coordinates variants (x,y pixels) for unlabeled icons. Use clear_text before type to overwrite existing text. Use scroll_to to find elements off-screen.`,
   {
     steps: z
       .array(ActionStepSchema)
