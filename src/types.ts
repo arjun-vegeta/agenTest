@@ -164,6 +164,44 @@ const LongPressStepSchema = z.object({
   durationMs: z.number().int().positive().optional().describe('Hold duration in milliseconds'),
 });
 
+const TapCoordinatesStepSchema = z.object({
+  action: z.literal('tap_coordinates'),
+  x: z.number().describe('X coordinate in screen pixels'),
+  y: z.number().describe('Y coordinate in screen pixels'),
+});
+
+const LongPressCoordinatesStepSchema = z.object({
+  action: z.literal('long_press_coordinates'),
+  x: z.number().describe('X coordinate in screen pixels'),
+  y: z.number().describe('Y coordinate in screen pixels'),
+  durationMs: z.number().int().positive().optional().describe('Hold duration in milliseconds'),
+});
+
+const DoubleTapStepSchema = z.object({
+  action: z.literal('double_tap'),
+  target: ElementSelectorSchema,
+});
+
+const DoubleTapCoordinatesStepSchema = z.object({
+  action: z.literal('double_tap_coordinates'),
+  x: z.number().describe('X coordinate in screen pixels'),
+  y: z.number().describe('Y coordinate in screen pixels'),
+});
+
+const ClearTextStepSchema = z.object({
+  action: z.literal('clear_text'),
+  target: ElementSelectorSchema.describe('Text field to clear'),
+});
+
+const SwipeCoordinatesStepSchema = z.object({
+  action: z.literal('swipe_coordinates'),
+  x1: z.number().describe('Start X'),
+  y1: z.number().describe('Start Y'),
+  x2: z.number().describe('End X'),
+  y2: z.number().describe('End Y'),
+  durationMs: z.number().int().positive().optional().describe('Swipe duration in milliseconds'),
+});
+
 const PressKeyStepSchema = z.object({
   action: z.literal('press_key'),
   keycode: z
@@ -174,6 +212,18 @@ const PressKeyStepSchema = z.object({
 const WaitStepSchema = z.object({
   action: z.literal('wait'),
   timeoutMs: z.number().int().positive().describe('Time to wait in milliseconds'),
+});
+
+const WaitForStableStepSchema = z.object({
+  action: z.literal('wait_for_stable'),
+  timeoutMs: z
+    .number()
+    .int()
+    .positive()
+    .optional()
+    .describe(
+      'Max time to wait for UI to settle and loading indicators to disappear (default: 30s)',
+    ),
 });
 
 const AssertVisibleSchema = z.object({
@@ -218,11 +268,18 @@ const ScrollToSchema = z.object({
 
 export const ActionStepSchema = z.discriminatedUnion('action', [
   TapStepSchema,
+  TapCoordinatesStepSchema,
   TypeStepSchema,
   SwipeStepSchema,
+  SwipeCoordinatesStepSchema,
   LongPressStepSchema,
+  LongPressCoordinatesStepSchema,
+  DoubleTapStepSchema,
+  DoubleTapCoordinatesStepSchema,
+  ClearTextStepSchema,
   PressKeyStepSchema,
   WaitStepSchema,
+  WaitForStableStepSchema,
   AssertVisibleSchema,
   AssertNotVisibleSchema,
   AssertTextEqualsSchema,
@@ -242,6 +299,8 @@ export interface StepResult {
   success: boolean;
   durationMs: number;
   error?: string;
+  /** If loading indicators were detected and waited out, describes what was found */
+  loadingDetected?: string;
 }
 
 export interface FlowTrace {

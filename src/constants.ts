@@ -154,6 +154,27 @@ export const SWIPE_OFFSETS = {
 } as const;
 
 // ---------------------------------------------------------------------------
+// Double Tap Timing
+// ---------------------------------------------------------------------------
+
+export const DOUBLE_TAP = {
+  /** Delay between the two taps (ms) */
+  INTERVAL_MS: 100,
+} as const;
+
+// ---------------------------------------------------------------------------
+// Clear Text Key Sequence
+// ---------------------------------------------------------------------------
+
+export const CLEAR_TEXT = {
+  /** Number of delete key presses to clear a field (generous upper bound) */
+  MAX_DELETE_PRESSES: 100,
+  /** Keycode for select-all */
+  SELECT_ALL_KEYCODE: 'KEYCODE_MOVE_HOME',
+  SHIFT_SELECT_ALL: '--longpress',
+} as const;
+
+// ---------------------------------------------------------------------------
 // Retry Configuration
 // ---------------------------------------------------------------------------
 
@@ -218,6 +239,41 @@ export const SCROLL_TO = {
 // ---------------------------------------------------------------------------
 // System Dialog Detection
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Loading Indicator Detection
+// ---------------------------------------------------------------------------
+
+export const LOADING_INDICATORS = {
+  /** Android class names that indicate loading */
+  CLASS_NAMES: ['android.widget.ProgressBar'] as readonly string[],
+  /** Class name substrings that indicate loading */
+  CLASS_FRAGMENTS: [
+    'ProgressBar',
+    'ProgressIndicator',
+    'ShimmerFrameLayout',
+    'Shimmer',
+    'SkeletonLayout',
+  ] as readonly string[],
+  /** Text patterns that indicate loading (case-insensitive) */
+  TEXT_PATTERNS: [
+    /^loading\.{0,3}$/i,
+    /^please wait\.{0,3}$/i,
+    /^fetching\.{0,3}$/i,
+    /^connecting\.{0,3}$/i,
+  ] as readonly RegExp[],
+  /** Content description patterns that indicate loading (case-insensitive) */
+  DESC_PATTERNS: [/loading/i, /progress/i, /spinner/i] as readonly RegExp[],
+} as const;
+
+export const IDLE_LOADING = {
+  /** Max time to wait for loading indicators to disappear after tree stabilizes (ms).
+   *  Kept short (8s) so the server returns control to Claude quickly.
+   *  If loading is still in progress, the next step's idle detection will pick it up. */
+  MAX_LOADING_WAIT_MS: 8_000,
+  /** Poll interval when waiting for loading indicators to disappear (ms) */
+  LOADING_POLL_INTERVAL_MS: 500,
+} as const;
 
 export const SYSTEM_PACKAGES = [
   'com.android.systemui',
