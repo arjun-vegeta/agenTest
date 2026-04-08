@@ -1,4 +1,4 @@
-import { SCROLL_TO, SWIPE_OFFSETS, TIMEOUTS } from '../constants.js';
+import { DOUBLE_TAP, SCROLL_TO, SWIPE_OFFSETS, TIMEOUTS } from '../constants.js';
 import { ElementNotFoundError } from '../errors.js';
 import type { ActionStep, Bounds, ElementSelector, UnifiedUINode } from '../types.js';
 import type { AdbClient } from './adb.js';
@@ -81,6 +81,17 @@ export async function executeAction(
       break;
     }
 
+    case 'tap_coordinates': {
+      await adb.tap(step.x, step.y);
+      break;
+    }
+
+    case 'long_press_coordinates': {
+      const duration = step.durationMs ?? TIMEOUTS.LONG_PRESS_DURATION_MS;
+      await adb.longPress(step.x, step.y, duration);
+      break;
+    }
+
     case 'type': {
       const element = resolveTarget(tree, step.target);
       // Tap the field first to focus it
@@ -94,6 +105,35 @@ export async function executeAction(
       const coords = computeSwipeCoords(step.direction, bounds);
       const duration = step.durationMs ?? TIMEOUTS.SWIPE_DURATION_MS;
       await adb.swipe(coords.x1, coords.y1, coords.x2, coords.y2, duration);
+      break;
+    }
+
+    case 'swipe_coordinates': {
+      const duration = step.durationMs ?? TIMEOUTS.SWIPE_DURATION_MS;
+      await adb.swipe(step.x1, step.y1, step.x2, step.y2, duration);
+      break;
+    }
+
+    case 'double_tap': {
+      const element = resolveTarget(tree, step.target);
+      await adb.tap(element.center.x, element.center.y);
+      await sleep(DOUBLE_TAP.INTERVAL_MS);
+      await adb.tap(element.center.x, element.center.y);
+      break;
+    }
+
+    case 'double_tap_coordinates': {
+      await adb.tap(step.x, step.y);
+      await sleep(DOUBLE_TAP.INTERVAL_MS);
+      await adb.tap(step.x, step.y);
+      break;
+    }
+
+    case 'clear_text': {
+      const element = resolveTarget(tree, step.target);
+      // Tap the field to focus it, then clear
+      await adb.tap(element.center.x, element.center.y);
+      await adb.clearTextField();
       break;
     }
 
