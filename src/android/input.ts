@@ -1,7 +1,8 @@
-import { SWIPE_OFFSETS, TIMEOUTS } from '../constants.js';
+import { SCROLL_TO, SWIPE_OFFSETS, TIMEOUTS } from '../constants.js';
 import { ElementNotFoundError } from '../errors.js';
 import type { ActionStep, Bounds, ElementSelector, UnifiedUINode } from '../types.js';
 import type { AdbClient } from './adb.js';
+import { snapshotTree } from './idle.js';
 import { findElements } from './tree-parser.js';
 
 // ---------------------------------------------------------------------------
@@ -110,6 +111,40 @@ export async function executeAction(
 
     case 'wait': {
       await sleep(step.timeoutMs);
+      break;
+    }
+
+    case 'scroll_to': {
+      const direction = step.direction ?? 'down';
+      const maxScrolls = step.maxScrolls ?? SCROLL_TO.MAX_SCROLLS;
+      const scrollBounds = step.scrollTarget
+        ? resolveTarget(tree, step.scrollTarget).bounds
+        : screenBounds;
+
+      for (let i = 0; i < maxScrolls; i++) {
+        // Check if target is already visible
+        const currentTree = await snapshotTree(adb);
+        const matches = findElements(currentTree, step.target);
+        if (matches.length > 0) {
+          return; // Found it
+        }
+
+        // Swipe to scroll
+        const coords = computeSwipeCoords(direction, scrollBounds);
+        const duration = TIMEOUTS.SWIPE_DURATION_MS;
+        await adb.swipe(coords.x1, coords.y1, coords.x2, coords.y2, duration);
+        await sleep(SCROLL_TO.SCROLL_SETTLE_MS);
+      }
+
+      // Final check after all scrolls
+      const finalTree = await snapshotTree(adb);
+      const finalMatches = findElements(finalTree, step.target);
+      if (finalMatches.length === 0) {
+        throw new ElementNotFoundError(
+          `Element not found after ${maxScrolls} scroll attempts: ${JSON.stringify(step.target)}`,
+          step.target,
+        );
+      }
       break;
     }
 

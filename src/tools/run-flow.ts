@@ -2,7 +2,14 @@ import { AdbClient } from '../android/adb.js';
 import { snapshotTree, waitForIdle } from '../android/idle.js';
 import { checkAssertion, executeAction } from '../android/input.js';
 import { serializeTreeForLlm } from '../android/tree-parser.js';
-import type { ActionStep, Bounds, FlowTrace, ShellExecutor, StepResult } from '../types.js';
+import type {
+  ActionStep,
+  Bounds,
+  FlowTrace,
+  ShellExecutor,
+  StepResult,
+  SystemDialog,
+} from '../types.js';
 
 // Default screen bounds (1080x1920) — used for screen-level swipes
 // when we can't determine actual screen size from the tree root
@@ -17,6 +24,10 @@ function isAssertionStep(step: ActionStep): boolean {
   return step.action.startsWith('assert_');
 }
 
+function isScrollToStep(step: ActionStep): boolean {
+  return step.action === 'scroll_to';
+}
+
 export async function handleRunFlow(
   shell: ShellExecutor,
   steps: ActionStep[],
@@ -24,11 +35,16 @@ export async function handleRunFlow(
 ): Promise<FlowTrace> {
   const adb = new AdbClient(shell, deviceId);
   const results: StepResult[] = [];
+  const detectedDialogs: SystemDialog[] = [];
 
   // Get initial tree to determine screen bounds and provide context for actions
   let currentTree = await snapshotTree(adb);
   const screenBounds: Bounds =
     currentTree.bounds.right > 0 ? currentTree.bounds : DEFAULT_SCREEN_BOUNDS;
+
+  // Check for system dialogs on the initial screen
+  const initialDialogs = await adb.detectSystemDialogs(currentTree);
+  detectedDialogs.push(...initialDialogs);
 
   for (let i = 0; i < steps.length; i++) {
     const step = steps[i];
@@ -58,6 +74,7 @@ export async function handleRunFlow(
             results,
             finalUiTree: serializeTreeForLlm(currentTree),
             error: assertionResult.message,
+            systemDialogs: detectedDialogs.length > 0 ? detectedDialogs : undefined,
           };
         }
       } else if (step.action === 'wait') {
@@ -70,10 +87,25 @@ export async function handleRunFlow(
           success: true,
           durationMs: Date.now() - stepStart,
         });
+      } else if (isScrollToStep(step)) {
+        // scroll_to handles its own idle/snapshot loop internally
+        await executeAction(adb, currentTree, step, screenBounds);
+        currentTree = await snapshotTree(adb);
+
+        results.push({
+          stepIndex: i,
+          action: step,
+          success: true,
+          durationMs: Date.now() - stepStart,
+        });
       } else {
         // Action step — execute then wait for idle
         await executeAction(adb, currentTree, step, screenBounds);
         currentTree = await waitForIdle(adb);
+
+        // Check for system dialogs after each action
+        const dialogs = await adb.detectSystemDialogs(currentTree);
+        detectedDialogs.push(...dialogs);
 
         results.push({
           stepIndex: i,
@@ -107,6 +139,7 @@ export async function handleRunFlow(
         results,
         finalUiTree: serializeTreeForLlm(currentTree),
         error: `Step ${i} (${step.action}) failed: ${errorMessage}`,
+        systemDialogs: detectedDialogs.length > 0 ? detectedDialogs : undefined,
       };
     }
   }
@@ -118,5 +151,6 @@ export async function handleRunFlow(
     totalSteps: steps.length,
     results,
     finalUiTree: serializeTreeForLlm(currentTree),
+    systemDialogs: detectedDialogs.length > 0 ? detectedDialogs : undefined,
   };
 }
