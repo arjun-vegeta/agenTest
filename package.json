@@ -1,0 +1,41 @@
+{
+  "name": "lazytest",
+  "version": "0.1.0",
+  "description": "AI-driven mobile app testing via MCP — reads accessibility trees, injects input via ADB",
+  "type": "module",
+  "main": "dist/server.js",
+  "bin": {
+    "lazytest": "dist/server.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/server.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint src/",
+    "lint:fix": "eslint src/ --fix",
+    "format": "prettier --write 'src/**/*.ts'",
+    "format:check": "prettier --check 'src/**/*.ts'",
+    "typecheck": "tsc --noEmit"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "fast-xml-parser": "^5.2.0",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.25.0",
+    "@types/node": "^22.14.0",
+    "eslint": "^9.25.0",
+    "eslint-config-prettier": "^10.1.0",
+    "prettier": "^3.5.0",
+    "typescript": "^5.8.0",
+    "typescript-eslint": "^8.30.0",
+    "vitest": "^3.1.0"
+  },
+  "license": "MIT"
+}
