@@ -22,8 +22,8 @@ describe('waitForIdle', () => {
     const shell = new MockShellExecutor();
     const loginXml = loadFixture('login-screen.xml');
 
-    shell.when('uiautomator dump', 'OK');
-    shell.when('cat /sdcard/window_dump.xml', loginXml);
+    // Batched command: rm + dump + cat in one call — match on dump, return XML
+    shell.when('uiautomator dump', loginXml);
 
     const adb = new AdbClient(shell);
     const result = await waitForIdle(adb, {
@@ -46,14 +46,10 @@ describe('waitForIdle', () => {
     const loginXml = loadFixture('login-screen.xml');
     const homeXml = loadFixture('home-screen.xml');
 
-    shell.when('uiautomator dump', 'OK');
-    const originalExec = shell.exec.bind(shell);
-    shell.exec = async (command, options) => {
-      if (command.includes('cat /sdcard/window_dump.xml')) {
-        callCount++;
-        return callCount % 2 === 0 ? homeXml : loginXml;
-      }
-      return originalExec(command, options);
+    // Override exec to alternate tree responses on the batched dump command
+    shell.exec = async () => {
+      callCount++;
+      return callCount % 2 === 0 ? homeXml : loginXml;
     };
 
     const adb = new AdbClient(shell);

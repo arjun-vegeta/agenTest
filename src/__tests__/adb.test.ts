@@ -129,23 +129,30 @@ describe('AdbClient.forceStopApp', () => {
 // ---------------------------------------------------------------------------
 
 describe('AdbClient.dumpUiTree', () => {
-  it('dumps and reads the UI tree', async () => {
+  it('dumps and reads the UI tree in a single batched command', async () => {
     const { shell, adb } = createMockAdb();
-    shell.when('uiautomator dump', 'UI hierchary dumped to: /sdcard/window_dump.xml\n');
+    // Batched command contains rm + dump + cat in one adb shell call
     shell.when(
-      'cat /sdcard/window_dump.xml',
+      'uiautomator dump',
       '<hierarchy rotation="0"><node index="0" text="" resource-id="" class="android.widget.FrameLayout" package="com.example" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[0,0][1080,1920]" /></hierarchy>',
     );
 
     const xml = await adb.dumpUiTree();
     expect(xml).toContain('<hierarchy');
     expect(xml).toContain('FrameLayout');
+
+    // Should be a single batched shell call (not 3 separate ones)
+    const calls = shell.getCalls();
+    const dumpCalls = calls.filter((c) => c.includes('uiautomator dump'));
+    expect(dumpCalls).toHaveLength(1);
+    // The batched command should contain rm, dump, and cat
+    expect(dumpCalls[0]).toContain('rm -f');
+    expect(dumpCalls[0]).toContain('cat');
   });
 
   it('throws when dump returns no XML', async () => {
     const { shell, adb } = createMockAdb();
-    shell.when('uiautomator dump', 'OK\n');
-    shell.when('cat /sdcard/window_dump.xml', 'ERROR: could not get idle state');
+    shell.when('uiautomator dump', 'ERROR: could not get idle state');
 
     await expect(adb.dumpUiTree()).rejects.toThrow(AdbCommandError);
   });

@@ -3,6 +3,7 @@ import {
   ADB_COMMANDS,
   ADB_COMMANDS_EXT,
   ANDROID_PROPS,
+  KEYCODES,
   LOGCAT,
   MONKEY_FLAGS,
   RETRY,
@@ -102,23 +103,11 @@ export class AdbClient {
 
   async dumpUiTree(): Promise<string> {
     return this.withRetry(async () => {
-      // Step 1: delete stale dump to avoid reading cached data
-      await this.shell
-        .exec(this.buildShellCommand(`rm -f ${ADB.DUMP_PATH}`), {
-          timeoutMs: TIMEOUTS.SHELL_COMMAND_MS,
-        })
-        .catch(() => {
-          // Ignore — file may not exist
-        });
-
-      // Step 2: trigger the dump
-      await this.shell.exec(this.buildShellCommand(`${ADB_COMMANDS.UI_DUMP} ${ADB.DUMP_PATH}`), {
-        timeoutMs: TIMEOUTS.SHELL_COMMAND_MS,
-      });
-
-      // Step 3: read the file
+      // Batched: rm stale + dump + cat in a single adb shell call (1 process spawn instead of 3)
       const xml = await this.shell.exec(
-        this.buildShellCommand(`${ADB_COMMANDS.CAT} ${ADB.DUMP_PATH}`),
+        this.buildShellCommand(
+          `rm -f ${ADB.DUMP_PATH} && ${ADB_COMMANDS.UI_DUMP} ${ADB.DUMP_PATH} > /dev/null 2>&1 && ${ADB_COMMANDS.CAT} ${ADB.DUMP_PATH}`,
+        ),
         { timeoutMs: TIMEOUTS.SHELL_COMMAND_MS },
       );
 
@@ -142,16 +131,37 @@ export class AdbClient {
   }
 
   async type(text: string): Promise<void> {
-    // adb shell input text requires escaping shell-special characters
-    // and replacing spaces with %s
-    const escaped = text
-      .replace(/%/g, '%%')
-      .replace(/ /g, '%s')
-      .replace(/[&|;`$"'\\<>(){}!#*?[\]]/g, '\\$&');
+    if (this.isAsciiPrintable(text)) {
+      // Fast path: adb shell input text with escaping
+      const escaped = text
+        .replace(/%/g, '%%')
+        .replace(/ /g, '%s')
+        .replace(/[&|;`$"'\\<>(){}!#*?[\]]/g, '\\$&');
 
-    await this.shell.exec(this.buildShellCommand(`${ADB_COMMANDS.INPUT_TEXT} "${escaped}"`), {
-      timeoutMs: TIMEOUTS.ACTION_TIMEOUT_MS,
-    });
+      await this.shell.exec(this.buildShellCommand(`${ADB_COMMANDS.INPUT_TEXT} "${escaped}"`), {
+        timeoutMs: TIMEOUTS.ACTION_TIMEOUT_MS,
+      });
+    } else {
+      // Clipboard path for unicode, emoji, special chars
+      await this.typeViaClipboard(text);
+    }
+  }
+
+  private isAsciiPrintable(text: string): boolean {
+    return /^[\x20-\x7E]*$/.test(text);
+  }
+
+  private async typeViaClipboard(text: string): Promise<void> {
+    // Set clipboard via broadcast, then paste
+    const escaped = text.replace(/'/g, "'\\''");
+    await this.shell.exec(
+      this.buildShellCommand(`am broadcast -a clipboardSetText --es text '${escaped}'`),
+      { timeoutMs: TIMEOUTS.ACTION_TIMEOUT_MS },
+    );
+    await this.shell.exec(
+      this.buildShellCommand(`${ADB_COMMANDS.INPUT_KEYEVENT} ${KEYCODES.PASTE}`),
+      { timeoutMs: TIMEOUTS.ACTION_TIMEOUT_MS },
+    );
   }
 
   async swipe(x1: number, y1: number, x2: number, y2: number, durationMs: number): Promise<void> {

@@ -18,22 +18,18 @@ function createScrollSimulator() {
 
   let scrollCount = 0;
 
-  shell.when('uiautomator dump', 'OK');
   shell.when('input tap', '');
   shell.when('input text', '');
   shell.when('input swipe', '');
   shell.when('input keyevent', '');
 
-  // scroll_to needs snapshotTree which calls dumpUiTree
-  // After 3 scrolls, "reveal" the target element by switching to home screen
-  // (home screen has welcome_text which login screen doesn't)
+  // Batched dump command — track scrolls and switch screen after 3
   const originalExec = shell.exec.bind(shell);
   shell.exec = async (command, options) => {
     if (command.includes('input swipe')) {
       scrollCount++;
     }
-    if (command.includes('cat /sdcard/window_dump.xml')) {
-      // After 3 scrolls, target becomes visible (home screen has welcome_text)
+    if (command.includes('uiautomator dump')) {
       return scrollCount >= 3 ? homeXml : loginXml;
     }
     return originalExec(command, options);
@@ -64,13 +60,12 @@ describe('scroll_to action', () => {
     const shell = new MockShellExecutor();
     const loginXml = loadFixture('login-screen.xml');
 
-    shell.when('uiautomator dump', 'OK');
     shell.when('input swipe', '');
 
     // Always return login screen — target never appears
     const originalExec = shell.exec.bind(shell);
     shell.exec = async (command, options) => {
-      if (command.includes('cat /sdcard/window_dump.xml')) {
+      if (command.includes('uiautomator dump')) {
         return loginXml;
       }
       return originalExec(command, options);

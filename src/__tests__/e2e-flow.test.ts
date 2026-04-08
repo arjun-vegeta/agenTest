@@ -34,16 +34,14 @@ function createAppSimulator() {
   // Force stop succeeds
   shell.when('force-stop', '');
 
-  // UI dump always succeeds
-  shell.when('uiautomator dump', 'OK');
-
   // Input commands succeed
   shell.when('input tap', '');
   shell.when('input text', '');
   shell.when('input swipe', '');
   shell.when('input keyevent', '');
 
-  // Override exec to track screen state
+  // Override exec to track screen state and return appropriate XML
+  // Batched dump command contains both "uiautomator dump" and "cat" in one call
   const originalExec = shell.exec.bind(shell);
   shell.exec = async (command, options) => {
     // When we tap the sign in button, switch to home screen
@@ -56,8 +54,8 @@ function createAppSimulator() {
       currentScreen = 'login';
     }
 
-    // Return the appropriate XML based on current screen
-    if (command.includes('cat /sdcard/window_dump.xml')) {
+    // Batched dump command — return XML based on current screen
+    if (command.includes('uiautomator dump')) {
       return currentScreen === 'login' ? loginXml : homeXml;
     }
 

@@ -132,19 +132,13 @@ describe('ADB retry logic', () => {
     const shell = new MockShellExecutor();
     let dumpCallCount = 0;
 
-    const originalExec = shell.exec.bind(shell);
-    shell.exec = async (command, options) => {
-      if (command.includes('uiautomator dump')) {
-        dumpCallCount++;
-        if (dumpCallCount < 3) {
-          throw new Error('Dump failed');
-        }
-        return 'OK';
+    // Batched dump: single command with rm + dump + cat
+    shell.exec = async () => {
+      dumpCallCount++;
+      if (dumpCallCount < 3) {
+        throw new Error('Dump failed');
       }
-      if (command.includes('cat /sdcard/window_dump.xml')) {
-        return '<hierarchy rotation="0"><node index="0" text="" resource-id="" class="android.widget.FrameLayout" package="com.example" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[0,0][1080,1920]" /></hierarchy>';
-      }
-      return originalExec(command, options);
+      return '<hierarchy rotation="0"><node index="0" text="" resource-id="" class="android.widget.FrameLayout" package="com.example" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[0,0][1080,1920]" /></hierarchy>';
     };
 
     const adb = new AdbClient(shell);
