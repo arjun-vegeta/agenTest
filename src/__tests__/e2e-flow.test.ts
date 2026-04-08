@@ -195,6 +195,89 @@ describe('E2E: Full login flow', () => {
     expect(shell.getCallsMatching('input keyevent').length).toBeGreaterThan(0);
   });
 
+  it('handles tap_coordinates for unlabeled icons', async () => {
+    const { shell } = createAppSimulator();
+
+    const steps: ActionStep[] = [{ action: 'tap_coordinates', x: 1184, y: 228 }];
+
+    const trace = await handleRunFlow(shell, steps);
+
+    expect(trace.success).toBe(true);
+    const tapCalls = shell.getCallsMatching('input tap');
+    expect(tapCalls.length).toBeGreaterThan(0);
+    expect(tapCalls.some((c) => c.includes('1184') && c.includes('228'))).toBe(true);
+  });
+
+  it('handles long_press_coordinates', async () => {
+    const { shell } = createAppSimulator();
+
+    const steps: ActionStep[] = [
+      { action: 'long_press_coordinates', x: 540, y: 960, durationMs: 800 },
+    ];
+
+    const trace = await handleRunFlow(shell, steps);
+
+    expect(trace.success).toBe(true);
+    const swipeCalls = shell.getCallsMatching('input swipe');
+    // long_press is zero-distance swipe: same start and end coords
+    expect(swipeCalls.some((c) => c.includes('540 960 540 960 800'))).toBe(true);
+  });
+
+  it('handles double_tap on element', async () => {
+    const { shell } = createAppSimulator();
+
+    const steps: ActionStep[] = [{ action: 'double_tap', target: { id: 'email' } }];
+
+    const trace = await handleRunFlow(shell, steps);
+
+    expect(trace.success).toBe(true);
+    // Double tap = two tap commands
+    const tapCalls = shell.getCallsMatching('input tap');
+    expect(tapCalls.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('handles double_tap_coordinates', async () => {
+    const { shell } = createAppSimulator();
+
+    const steps: ActionStep[] = [{ action: 'double_tap_coordinates', x: 300, y: 400 }];
+
+    const trace = await handleRunFlow(shell, steps);
+
+    expect(trace.success).toBe(true);
+    const tapCalls = shell.getCallsMatching('input tap');
+    const coordTaps = tapCalls.filter((c) => c.includes('300') && c.includes('400'));
+    expect(coordTaps.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('handles swipe_coordinates', async () => {
+    const { shell } = createAppSimulator();
+
+    const steps: ActionStep[] = [
+      { action: 'swipe_coordinates', x1: 100, y1: 800, x2: 100, y2: 200, durationMs: 400 },
+    ];
+
+    const trace = await handleRunFlow(shell, steps);
+
+    expect(trace.success).toBe(true);
+    const swipeCalls = shell.getCallsMatching('input swipe');
+    expect(swipeCalls.some((c) => c.includes('100 800 100 200 400'))).toBe(true);
+  });
+
+  it('handles clear_text on a text field', async () => {
+    const { shell } = createAppSimulator();
+
+    const steps: ActionStep[] = [{ action: 'clear_text', target: { id: 'email' } }];
+
+    const trace = await handleRunFlow(shell, steps);
+
+    expect(trace.success).toBe(true);
+    // Should tap the field first, then send key events to clear
+    const tapCalls = shell.getCallsMatching('input tap');
+    expect(tapCalls.length).toBeGreaterThan(0);
+    const keyCalls = shell.getCallsMatching('input keyevent');
+    expect(keyCalls.length).toBeGreaterThan(0);
+  });
+
   it('resets the app and returns fresh tree', async () => {
     const { shell, getCurrentScreen } = createAppSimulator();
 
