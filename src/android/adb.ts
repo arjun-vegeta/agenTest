@@ -102,12 +102,21 @@ export class AdbClient {
 
   async dumpUiTree(): Promise<string> {
     return this.withRetry(async () => {
-      // Step 1: trigger the dump
+      // Step 1: delete stale dump to avoid reading cached data
+      await this.shell
+        .exec(this.buildShellCommand(`rm -f ${ADB.DUMP_PATH}`), {
+          timeoutMs: TIMEOUTS.SHELL_COMMAND_MS,
+        })
+        .catch(() => {
+          // Ignore — file may not exist
+        });
+
+      // Step 2: trigger the dump
       await this.shell.exec(this.buildShellCommand(`${ADB_COMMANDS.UI_DUMP} ${ADB.DUMP_PATH}`), {
         timeoutMs: TIMEOUTS.SHELL_COMMAND_MS,
       });
 
-      // Step 2: read the file
+      // Step 3: read the file
       const xml = await this.shell.exec(
         this.buildShellCommand(`${ADB_COMMANDS.CAT} ${ADB.DUMP_PATH}`),
         { timeoutMs: TIMEOUTS.SHELL_COMMAND_MS },
@@ -169,6 +178,36 @@ export class AdbClient {
       ),
       { timeoutMs: TIMEOUTS.ACTION_TIMEOUT_MS },
     );
+  }
+
+  async clearTextField(): Promise<void> {
+    // Select all text (Ctrl+A) then delete
+    await this.shell.exec(
+      this.buildShellCommand(`${ADB_COMMANDS.INPUT_KEYEVENT} KEYCODE_MOVE_END`),
+      { timeoutMs: TIMEOUTS.ACTION_TIMEOUT_MS },
+    );
+    // Hold shift + press home to select all, then delete
+    await this.shell.exec(
+      this.buildShellCommand(
+        `${ADB_COMMANDS.INPUT_KEYEVENT} --longpress KEYCODE_DEL KEYCODE_DEL KEYCODE_DEL KEYCODE_DEL KEYCODE_DEL KEYCODE_DEL KEYCODE_DEL KEYCODE_DEL KEYCODE_DEL KEYCODE_DEL KEYCODE_DEL KEYCODE_DEL KEYCODE_DEL KEYCODE_DEL KEYCODE_DEL KEYCODE_DEL KEYCODE_DEL KEYCODE_DEL KEYCODE_DEL KEYCODE_DEL`,
+      ),
+      { timeoutMs: TIMEOUTS.ACTION_TIMEOUT_MS },
+    );
+    // Try Ctrl+A, Delete as a more reliable approach
+    await this.shell
+      .exec(this.buildShellCommand(`input keyevent 29 --meta ctrl_on`), {
+        timeoutMs: TIMEOUTS.ACTION_TIMEOUT_MS,
+      })
+      .catch(() => {
+        // Fallback: older Android may not support --meta
+      });
+    await this.shell
+      .exec(this.buildShellCommand(`${ADB_COMMANDS.INPUT_KEYEVENT} KEYCODE_FORWARD_DEL`), {
+        timeoutMs: TIMEOUTS.ACTION_TIMEOUT_MS,
+      })
+      .catch(() => {
+        // Fallback: already cleared via longpress delete
+      });
   }
 
   // -----------------------------------------------------------------------
