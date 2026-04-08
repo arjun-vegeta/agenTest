@@ -152,3 +152,77 @@ export const SWIPE_OFFSETS = {
   /** Fraction of element (or screen) dimension used for swipe distance */
   DISTANCE_FRACTION: 0.6,
 } as const;
+
+// ---------------------------------------------------------------------------
+// Retry Configuration
+// ---------------------------------------------------------------------------
+
+export const RETRY = {
+  /** Max retry attempts for flaky ADB commands (e.g. uiautomator dump) */
+  MAX_ATTEMPTS: 3,
+  /** Base delay between retries (ms) — doubles each attempt */
+  BASE_DELAY_MS: 500,
+} as const;
+
+// ---------------------------------------------------------------------------
+// New Tool Names
+// ---------------------------------------------------------------------------
+
+export const TOOL_NAMES_EXT = {
+  GET_LOGS: 'lazytest_get_logs',
+  SCREENSHOT: 'lazytest_screenshot',
+  DEVICE_INFO: 'lazytest_device_info',
+} as const;
+
+// ---------------------------------------------------------------------------
+// ADB Extended Commands
+// ---------------------------------------------------------------------------
+
+export const ADB_COMMANDS_EXT = {
+  LOGCAT_DUMP: 'logcat -d',
+  LOGCAT_PID_FLAG: '--pid',
+  PIDOF: 'pidof',
+  SCREENCAP: 'screencap -p',
+  WM_SIZE: 'wm size',
+  WM_DENSITY: 'wm density',
+  GETPROP: 'getprop',
+} as const;
+
+export const ANDROID_PROPS = {
+  SDK_VERSION: 'ro.build.version.sdk',
+  ANDROID_VERSION: 'ro.build.version.release',
+  DEVICE_MODEL: 'ro.product.model',
+  DEVICE_MANUFACTURER: 'ro.product.manufacturer',
+} as const;
+
+// ---------------------------------------------------------------------------
+// Logcat
+// ---------------------------------------------------------------------------
+
+export const LOGCAT = {
+  /** Max lines to return from logcat */
+  MAX_LINES: 200,
+} as const;
+
+// ---------------------------------------------------------------------------
+// Scroll-to-find
+// ---------------------------------------------------------------------------
+
+export const SCROLL_TO = {
+  /** Default max scrolls before giving up */
+  MAX_SCROLLS: 10,
+  /** Delay between scroll + tree check (ms) */
+  SCROLL_SETTLE_MS: 300,
+} as const;
+
+// ---------------------------------------------------------------------------
+// System Dialog Detection
+// ---------------------------------------------------------------------------
+
+export const SYSTEM_PACKAGES = [
+  'com.android.systemui',
+  'com.android.packageinstaller',
+  'com.google.android.permissioncontroller',
+  'android',
+  'com.android.settings',
+] as const;

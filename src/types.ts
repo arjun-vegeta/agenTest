@@ -198,6 +198,24 @@ const AssertTextContainsSchema = z.object({
   value: z.string().describe('Expected substring'),
 });
 
+const ScrollToSchema = z.object({
+  action: z.literal('scroll_to'),
+  target: ElementSelectorSchema.describe('Element to scroll until visible'),
+  scrollTarget: ElementSelectorSchema.optional().describe(
+    'Scrollable container to scroll within; omit to scroll the first scrollable ancestor or screen',
+  ),
+  direction: z
+    .enum(['up', 'down', 'left', 'right'])
+    .optional()
+    .describe('Scroll direction (default: "down")'),
+  maxScrolls: z
+    .number()
+    .int()
+    .positive()
+    .optional()
+    .describe('Max scroll attempts before failing (default: 10)'),
+});
+
 export const ActionStepSchema = z.discriminatedUnion('action', [
   TapStepSchema,
   TypeStepSchema,
@@ -209,6 +227,7 @@ export const ActionStepSchema = z.discriminatedUnion('action', [
   AssertNotVisibleSchema,
   AssertTextEqualsSchema,
   AssertTextContainsSchema,
+  ScrollToSchema,
 ]);
 
 export type ActionStep = z.infer<typeof ActionStepSchema>;
@@ -233,6 +252,32 @@ export interface FlowTrace {
   /** UI tree snapshot at the end (or at point of failure) */
   finalUiTree: LlmTreeNode;
   error?: string;
+  /** System dialogs detected during the flow (permission prompts, crash dialogs) */
+  systemDialogs?: SystemDialog[];
+}
+
+// ---------------------------------------------------------------------------
+// Device Info
+// ---------------------------------------------------------------------------
+
+export interface DeviceInfo {
+  screenWidth: number;
+  screenHeight: number;
+  density: number;
+  sdkVersion: number;
+  androidVersion: string;
+  model: string;
+  manufacturer: string;
+}
+
+// ---------------------------------------------------------------------------
+// System Dialog Detection
+// ---------------------------------------------------------------------------
+
+export interface SystemDialog {
+  packageName: string;
+  title: string;
+  buttons: string[];
 }
 
 // ---------------------------------------------------------------------------
