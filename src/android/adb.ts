@@ -33,7 +33,9 @@ export class AdbClient {
   }
 
   private buildShellCommand(command: string): string {
-    return this.buildCommand(ADB.SHELL, command);
+    // Quote the command so compound operators (&&, |, etc.) run on the device,
+    // not the host shell
+    return this.buildCommand(ADB.SHELL, `"${command}"`);
   }
 
   // -----------------------------------------------------------------------
