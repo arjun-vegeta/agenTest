@@ -22,6 +22,11 @@
   "engines": {
     "node": ">=18.0.0"
   },
+  "files": [
+    "dist/**/*",
+    "android-helper/prebuilt/lazytest-helper.apk",
+    "android-helper/prebuilt/lazytest-helper-test.apk"
+  ],
   "dependencies": {
     "@grpc/grpc-js": "^1.14.3",
     "@grpc/proto-loader": "^0.8.0",
