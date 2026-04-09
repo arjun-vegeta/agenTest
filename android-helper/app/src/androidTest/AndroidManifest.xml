@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <application android:hasCode="true">
+        <uses-library
+            android:name="android.test.runner"
+            android:required="false" />
+    </application>
+
+    <!--
+      The instrumentation tag that makes `am instrument` work.
+
+      targetPackage = the main APK that the test process will run inside.
+      AndroidJUnitRunner will launch this package, attach the instrumentation,
+      and invoke our @Test entry point on a background thread.
+    -->
+    <instrumentation
+        android:name="androidx.test.runner.AndroidJUnitRunner"
+        android:targetPackage="com.lazytest.helper"
+        android:label="LazyTest Helper Server"
+        android:handleProfiling="false"
+        android:functionalTest="false" />
+
+</manifest>

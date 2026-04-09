@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!--
+      Permissions for the LazyTest helper app.
+
+      INTERNET / ACCESS_NETWORK_STATE: required for the embedded NanoHTTPD
+      server (even though it only binds to 127.0.0.1).
+
+      WAKE_LOCK: keep CPU awake while serving requests so the helper doesn't
+      go into doze when an emulator is idle for a few seconds.
+
+      QUERY_ALL_PACKAGES: allow framework detection to inspect /proc maps and
+      package state for arbitrary apps under test.
+
+      We deliberately do NOT request:
+        - INJECT_EVENTS (signature-level — granted via `am instrument`'s shell UID)
+        - WRITE/READ_EXTERNAL_STORAGE (triggers runtime permission prompts that
+          can kill the instrumentation, see appium/appium#17679)
+        - any FOREGROUND_SERVICE permissions
+    -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"
+        tools:ignore="QueryAllPackagesPermission" />
+
+    <application
+        android:allowBackup="false"
+        android:label="LazyTest Helper"
+        android:hasCode="true"
+        tools:ignore="MissingApplicationIcon">
+
+        <!--
+          Required for instrumentation to attach. The main APK has no Activity,
+          no Service, no launcher entry — it exists purely so the test APK has
+          a target package whose process the instrumentation can run inside.
+        -->
+        <uses-library
+            android:name="android.test.runner"
+            android:required="false" />
+    </application>
+    <uses-sdk tools:overrideLibrary="org.nanohttpd" />
+
+</manifest>
