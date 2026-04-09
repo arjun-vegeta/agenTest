@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { interpolateSwipePath } from '../android/grpc-touch.js';
+import {
+  interpolatePinchPath,
+  interpolateRotatePath,
+  interpolateSwipePath,
+} from '../android/grpc-touch.js';
 import { GRPC } from '../constants.js';
 
 describe('interpolateSwipePath', () => {
@@ -74,6 +78,106 @@ describe('interpolateSwipePath', () => {
     for (const frame of frames) {
       expect(Number.isInteger(frame.x)).toBe(true);
       expect(Number.isInteger(frame.y)).toBe(true);
+    }
+  });
+});
+
+describe('interpolatePinchPath', () => {
+  it('starts at startRadius and ends at endRadius', () => {
+    const frames = interpolatePinchPath(500, 500, 100, 300, 300);
+    const first = frames[0];
+    const last = frames[frames.length - 1];
+
+    expect(first).toBeDefined();
+    expect(last).toBeDefined();
+    // At startRadius=100, fingers at (400, 500) and (600, 500)
+    expect(first?.finger0.x).toBe(400);
+    expect(first?.finger1.x).toBe(600);
+    // At endRadius=300, fingers at (200, 500) and (800, 500)
+    expect(last?.finger0.x).toBe(200);
+    expect(last?.finger1.x).toBe(800);
+  });
+
+  it('fingers are always symmetric around center', () => {
+    const cx = 500;
+    const frames = interpolatePinchPath(cx, 500, 50, 200, 300);
+    for (const frame of frames) {
+      // finger0 and finger1 should be equidistant from cx
+      const dist0 = cx - frame.finger0.x;
+      const dist1 = frame.finger1.x - cx;
+      expect(dist0).toBe(dist1);
+      // Y is unchanged
+      expect(frame.finger0.y).toBe(500);
+      expect(frame.finger1.y).toBe(500);
+    }
+  });
+
+  it('produces frames at 60fps', () => {
+    const frames = interpolatePinchPath(500, 500, 100, 200, 300);
+    // 300ms * 60fps / 1000 = 18
+    expect(frames.length).toBe(18);
+  });
+
+  it('pinch-in (shrinking radius) works', () => {
+    const frames = interpolatePinchPath(500, 500, 300, 100, 300);
+    // First frame: fingers far apart
+    expect(frames[0]?.finger0.x).toBe(200);
+    expect(frames[0]?.finger1.x).toBe(800);
+    // Last frame: fingers close
+    const last = frames[frames.length - 1];
+    expect(last?.finger0.x).toBe(400);
+    expect(last?.finger1.x).toBe(600);
+  });
+});
+
+describe('interpolateRotatePath', () => {
+  it('starts at startAngle and ends at endAngle', () => {
+    // Rotate from 0 to 90 degrees (pi/2 rad), radius 100, center (500, 500)
+    const frames = interpolateRotatePath(500, 500, 100, 0, Math.PI / 2, 400);
+    const first = frames[0];
+    const last = frames[frames.length - 1];
+
+    expect(first).toBeDefined();
+    expect(last).toBeDefined();
+    // At angle 0: finger0 = (600, 500), finger1 = (400, 500)
+    expect(first?.finger0.x).toBe(600);
+    expect(first?.finger0.y).toBe(500);
+    expect(first?.finger1.x).toBe(400);
+    expect(first?.finger1.y).toBe(500);
+    // At angle pi/2: finger0 = (500, 600), finger1 = (500, 400)
+    expect(last?.finger0.x).toBe(500);
+    expect(last?.finger0.y).toBe(600);
+    expect(last?.finger1.x).toBe(500);
+    expect(last?.finger1.y).toBe(400);
+  });
+
+  it('fingers stay equidistant from center', () => {
+    const cx = 500;
+    const cy = 500;
+    const radius = 150;
+    const frames = interpolateRotatePath(cx, cy, radius, 0, Math.PI, 400);
+
+    for (const frame of frames) {
+      // Each finger distance from center should be ~radius
+      const d0 = Math.sqrt((frame.finger0.x - cx) ** 2 + (frame.finger0.y - cy) ** 2);
+      const d1 = Math.sqrt((frame.finger1.x - cx) ** 2 + (frame.finger1.y - cy) ** 2);
+      // Allow ±2 px tolerance for rounding
+      expect(Math.abs(d0 - radius)).toBeLessThanOrEqual(2);
+      expect(Math.abs(d1 - radius)).toBeLessThanOrEqual(2);
+    }
+  });
+
+  it('fingers are always on opposite sides of center', () => {
+    const cx = 500;
+    const cy = 500;
+    const frames = interpolateRotatePath(cx, cy, 100, 0, Math.PI, 400);
+
+    for (const frame of frames) {
+      // midpoint of the two fingers should equal center
+      const mx = (frame.finger0.x + frame.finger1.x) / 2;
+      const my = (frame.finger0.y + frame.finger1.y) / 2;
+      expect(mx).toBe(cx);
+      expect(my).toBe(cy);
     }
   });
 });
