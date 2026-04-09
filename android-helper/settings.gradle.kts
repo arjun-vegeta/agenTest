@@ -16,3 +16,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "lazytest-helper"
 include(":app")
+include(":idling-bridge")
