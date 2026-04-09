@@ -236,6 +236,7 @@ export const ADB_COMMANDS_EXT = {
   AM_INSTRUMENT: 'am instrument -w -r',
   PM_LIST_PKGS: 'pm list packages',
   DUMPSYS_PACKAGE: 'dumpsys package',
+  CONTENT_QUERY: 'content query',
 } as const;
 
 /**
@@ -415,6 +416,126 @@ export const HELPER = {
   REQUEST_TIMEOUT_MS: 10_000,
   /** Timeout for /wait-idle (longer because it can legitimately block). */
   WAIT_IDLE_TIMEOUT_MS: 30_000,
+} as const;
+
+// ---------------------------------------------------------------------------
+// Framework sync backends (Phase 3.5 / 3.6 / 3.7 / 3.9)
+// ---------------------------------------------------------------------------
+
+/**
+ * Hermes inspector (React Native debug builds). Metro exposes an inspector
+ * proxy on port 8081 that multiplexes CDP sessions to connected Hermes
+ * runtimes. Discovery: `GET /json/list` returns an array of targets with
+ * `webSocketDebuggerUrl`. The MCP server reaches Metro through `adb reverse`
+ * (so the emulator's localhost:8081 hits the host's Metro).
+ *
+ * Hermes debugging is disabled in release builds — every failure here is
+ * non-fatal; we just skip the CDP sync channel and rely on the helper's
+ * accessibility-event idle.
+ */
+export const HERMES = {
+  /** Metro inspector proxy host port. */
+  METRO_PORT: 8081,
+  /** Discovery endpoint on Metro. Returns JSON array of debug targets. */
+  JSON_LIST_PATH: '/json/list',
+  /** Max time to wait for the /json/list probe (ms). */
+  DISCOVERY_TIMEOUT_MS: 2_000,
+  /** Max time to wait for a CDP method reply (ms). */
+  CDP_REPLY_TIMEOUT_MS: 5_000,
+  /** Max time to keep probing for JS liveness after the helper reports UI idle (ms). */
+  SYNC_TIMEOUT_MS: 3_000,
+  /** Poll interval for JS liveness checks (ms). */
+  SYNC_POLL_MS: 80,
+  /**
+   * Round-trip threshold for declaring "JS thread is responsive" — an
+   * `evaluate` that returns within this window means Hermes isn't stuck in
+   * a hot loop. Kept generous because the CDP roundtrip through Metro's
+   * inspector proxy itself eats ~20-40ms on a real device.
+   */
+  SYNC_IDLE_THRESHOLD_MS: 120,
+  /** Consecutive responsive probes required to declare liveness. */
+  SYNC_STABLE_COUNT: 2,
+} as const;
+
+/**
+ * Flutter Dart VM Service. Flutter debug+profile builds write their
+ * Observatory URL to logcat on startup: `The Dart VM service is listening on
+ * http://127.0.0.1:<port>/<authCode>/`. We discover the port by grepping
+ * logcat, `adb forward` it to the host, then connect over WebSocket at
+ * `ws://127.0.0.1:<hostPort>/<authCode>/ws`. JSON-RPC 2.0.
+ *
+ * Disabled in `--release` builds — every failure is non-fatal.
+ */
+export const FLUTTER_VM = {
+  /** Host-side adb forward port for the Dart VM Service. */
+  HOST_PORT: 8766,
+  /** Logcat pattern used to discover the listening URL. */
+  LOGCAT_DISCOVERY_REGEX: /Dart VM [Ss]ervice is listening on (http:\/\/[^\s]+)/,
+  /** Max time to wait for logcat discovery (ms). */
+  DISCOVERY_TIMEOUT_MS: 5_000,
+  /** How many logcat lines to scan for the URL. */
+  DISCOVERY_MAX_LINES: 2_000,
+  /** Max time to wait for a JSON-RPC reply (ms). */
+  RPC_REPLY_TIMEOUT_MS: 5_000,
+  /**
+   * How many times to retry `getVM` when looking for the first isolate.
+   * Freshly-started Flutter apps can report an empty isolates list for up
+   * to ~500ms while the runtime initializes. Default = 8 retries × 100ms
+   * poll = ~800ms worst case.
+   */
+  ISOLATE_DISCOVERY_ATTEMPTS: 8,
+  /** Poll interval between isolate discovery retries (ms). */
+  ISOLATE_DISCOVERY_POLL_MS: 100,
+  /**
+   * Retry budget for ensureFlutterSemantics. The service extension isn't
+   * registered until the WidgetsBinding has initialized — on cold start
+   * we may hit the isolate before the binding is ready.
+   */
+  ENSURE_SEMANTICS_ATTEMPTS: 5,
+  /** Delay between ensureFlutterSemantics retries (ms). */
+  ENSURE_SEMANTICS_POLL_MS: 120,
+  /** Max time to keep probing for Flutter liveness (ms). */
+  SYNC_TIMEOUT_MS: 3_000,
+  /** Poll interval for liveness checks (ms). */
+  SYNC_POLL_MS: 80,
+  /**
+   * Round-trip threshold for declaring "Dart VM is responsive" — a
+   * getVM() that returns within this window means the isolate's event
+   * loop isn't wedged. Must be larger than the WebSocket roundtrip alone.
+   */
+  SYNC_IDLE_THRESHOLD_MS: 150,
+  /** Consecutive responsive probes required to declare liveness. */
+  SYNC_STABLE_COUNT: 2,
+} as const;
+
+/**
+ * LazyTest IdlingResource bridge (Phase 3.10). Opt-in AAR users add to their
+ * app's `debugImplementation`. Exposes a ContentProvider that the helper can
+ * query for pending-idle-resource counts.
+ *
+ * See android-helper/idling-bridge/ for the AAR source.
+ */
+export const IDLING_BRIDGE = {
+  /** Suffix appended to the app's package to form the provider authority. */
+  AUTHORITY_SUFFIX: '.lazytest.idling',
+  /** Content URI path for the idle-state query. */
+  QUERY_PATH: 'state',
+  /** Max time allowed for an idling-state query (ms). */
+  QUERY_TIMEOUT_MS: 2_000,
+  /**
+   * Wire format version of the idling bridge ContentProvider. Must match
+   * `LazyTestIdlingProvider.WIRE_VERSION` in the Kotlin AAR. Bump together
+   * when the cursor schema changes.
+   *
+   * The host uses this to detect when a user has updated LazyTest via npm
+   * but their Android app still has the old AAR baked into its debug build
+   * — Gradle caches AARs in the app's build cache, so a stale version can
+   * persist across `npm update lazytest` until the user rebuilds their app.
+   *
+   * On mismatch, `lazytest_connect` returns a warning with an actionable
+   * `./gradlew` rebuild command that the LLM surfaces to the developer.
+   */
+  EXPECTED_WIRE_VERSION: 1,
 } as const;
 
 /** Maps Android KEYCODE_* strings to W3C key values for gRPC sendKey */
