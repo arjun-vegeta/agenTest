@@ -38,6 +38,11 @@ export class AdbClient {
     return this.buildCommand(ADB.SHELL, `"${command}"`);
   }
 
+  /** Build `adb [-s device] emu <args>` for emulator console commands. */
+  private buildEmuCommand(...args: string[]): string {
+    return this.buildCommand(ADB_COMMANDS_EXT.EMU, ...args);
+  }
+
   // -----------------------------------------------------------------------
   // Device management
   // -----------------------------------------------------------------------
@@ -308,6 +313,111 @@ export class AdbClient {
       model: modelOut.trim(),
       manufacturer: manufacturerOut.trim(),
     };
+  }
+
+  // -----------------------------------------------------------------------
+  // App state inspection (SharedPreferences, SQLite)
+  // -----------------------------------------------------------------------
+
+  /**
+   * Read a SharedPreferences XML file from a debuggable app's storage.
+   * Requires the app to be a debuggable build (run-as fails on release builds).
+   */
+  async getSharedPrefs(packageName: string, file: string): Promise<string> {
+    const safeFile = file.endsWith('.xml') ? file : `${file}.xml`;
+    const cmd = `${ADB_COMMANDS_EXT.RUN_AS} ${packageName} cat ${ADB_COMMANDS_EXT.SHARED_PREFS_DIR}/${safeFile}`;
+    try {
+      const output = await this.shell.exec(this.buildShellCommand(cmd), {
+        timeoutMs: TIMEOUTS.SHELL_COMMAND_MS,
+      });
+      return output;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes('run-as: package not debuggable') || msg.includes('No such file')) {
+        throw new AdbCommandError(
+          `Cannot read shared_prefs for "${packageName}": app must be a debuggable build with file "${safeFile}" present`,
+          cmd,
+        );
+      }
+      throw err;
+    }
+  }
+
+  /**
+   * Run a SQL query against an app's SQLite database via run-as + sqlite3.
+   * Requires a debuggable build.
+   */
+  async queryDatabase(packageName: string, database: string, query: string): Promise<string> {
+    // Escape single quotes in query for shell
+    const escapedQuery = query.replace(/'/g, "'\\''");
+    const dbPath = `${ADB_COMMANDS_EXT.DATABASES_DIR}/${database}`;
+    const cmd = `${ADB_COMMANDS_EXT.RUN_AS} ${packageName} ${ADB_COMMANDS_EXT.SQLITE3} ${dbPath} '${escapedQuery}'`;
+    try {
+      const output = await this.shell.exec(this.buildShellCommand(cmd), {
+        timeoutMs: TIMEOUTS.SHELL_COMMAND_MS,
+      });
+      return output;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes('run-as: package not debuggable')) {
+        throw new AdbCommandError(
+          `Cannot query database for "${packageName}": app must be a debuggable build`,
+          cmd,
+        );
+      }
+      if (msg.includes('No such file')) {
+        throw new AdbCommandError(`Database "${database}" not found for "${packageName}"`, cmd);
+      }
+      throw err;
+    }
+  }
+
+  // -----------------------------------------------------------------------
+  // Network condition simulation
+  // -----------------------------------------------------------------------
+
+  /**
+   * Set emulator network speed using a preset (gsm, edge, 3g, lte, full)
+   * or custom up:down kbps.
+   */
+  async setNetworkSpeed(speed: string): Promise<void> {
+    await this.shell.exec(this.buildEmuCommand(ADB_COMMANDS_EXT.NETWORK_SPEED, speed), {
+      timeoutMs: TIMEOUTS.SHELL_COMMAND_MS,
+    });
+  }
+
+  /**
+   * Set emulator network latency using a preset (none, gprs, edge, umts)
+   * or custom min:max ms.
+   */
+  async setNetworkDelay(delay: string): Promise<void> {
+    await this.shell.exec(this.buildEmuCommand(ADB_COMMANDS_EXT.NETWORK_DELAY, delay), {
+      timeoutMs: TIMEOUTS.SHELL_COMMAND_MS,
+    });
+  }
+
+  /** Toggle WiFi on/off via svc command. */
+  async setWifi(enabled: boolean): Promise<void> {
+    const action = enabled ? 'enable' : 'disable';
+    await this.shell.exec(this.buildShellCommand(`${ADB_COMMANDS_EXT.SVC_WIFI} ${action}`), {
+      timeoutMs: TIMEOUTS.SHELL_COMMAND_MS,
+    });
+  }
+
+  /** Toggle mobile data on/off via svc command. */
+  async setMobileData(enabled: boolean): Promise<void> {
+    const action = enabled ? 'enable' : 'disable';
+    await this.shell.exec(this.buildShellCommand(`${ADB_COMMANDS_EXT.SVC_DATA} ${action}`), {
+      timeoutMs: TIMEOUTS.SHELL_COMMAND_MS,
+    });
+  }
+
+  /** Toggle airplane mode on/off via cmd connectivity. */
+  async setAirplaneMode(enabled: boolean): Promise<void> {
+    const action = enabled ? 'enable' : 'disable';
+    await this.shell.exec(this.buildShellCommand(`${ADB_COMMANDS_EXT.AIRPLANE_MODE} ${action}`), {
+      timeoutMs: TIMEOUTS.SHELL_COMMAND_MS,
+    });
   }
 
   // -----------------------------------------------------------------------
