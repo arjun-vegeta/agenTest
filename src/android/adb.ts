@@ -468,6 +468,91 @@ export class AdbClient {
   }
 
   // -----------------------------------------------------------------------
+  // Helper APK lifecycle (Phase 3)
+  // -----------------------------------------------------------------------
+
+  /** `adb install -r -t <path>` — replace if present, allow test APKs. */
+  async installApk(apkPath: string): Promise<void> {
+    await this.shell.exec(
+      this.buildCommand(
+        ADB_COMMANDS_EXT.INSTALL,
+        ADB_COMMANDS_EXT.INSTALL_REPLACE,
+        ADB_COMMANDS_EXT.INSTALL_TEST,
+        `"${apkPath}"`,
+      ),
+      { timeoutMs: TIMEOUTS.SHELL_COMMAND_MS },
+    );
+  }
+
+  /** `adb uninstall <package>` — best-effort, ignores "not installed" errors. */
+  async uninstallPackage(packageName: string): Promise<void> {
+    try {
+      await this.shell.exec(this.buildCommand(ADB_COMMANDS_EXT.UNINSTALL, packageName), {
+        timeoutMs: TIMEOUTS.SHELL_COMMAND_MS,
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (!msg.includes('not installed') && !msg.includes('DELETE_FAILED')) {
+        throw err;
+      }
+    }
+  }
+
+  /** Check whether a package is installed on the device. */
+  async isPackageInstalled(packageName: string): Promise<boolean> {
+    const out = await this.shell.exec(
+      this.buildShellCommand(`${ADB_COMMANDS_EXT.PM_LIST_PKGS} ${packageName}`),
+      { timeoutMs: TIMEOUTS.SHELL_COMMAND_MS },
+    );
+    return out.split('\n').some((line) => line.trim() === `package:${packageName}`);
+  }
+
+  /**
+   * Read the versionCode of an installed package via `dumpsys package`.
+   * Returns null if not installed or if dumpsys output is unexpected.
+   */
+  async getPackageVersionCode(packageName: string): Promise<number | null> {
+    try {
+      const out = await this.shell.exec(
+        this.buildShellCommand(`${ADB_COMMANDS_EXT.DUMPSYS_PACKAGE} ${packageName}`),
+        { timeoutMs: TIMEOUTS.SHELL_COMMAND_MS },
+      );
+      const match = /versionCode=(\d+)/.exec(out);
+      return match ? Number(match[1]) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /** `adb forward tcp:<host> tcp:<device>` — set up port forward. */
+  async forwardPort(hostPort: number, devicePort: number): Promise<void> {
+    await this.shell.exec(
+      this.buildCommand(ADB_COMMANDS_EXT.FORWARD, `tcp:${hostPort}`, `tcp:${devicePort}`),
+      { timeoutMs: TIMEOUTS.SHELL_COMMAND_MS },
+    );
+  }
+
+  /** Remove a port forward; ignores errors if it wasn't set. */
+  async removeForward(hostPort: number): Promise<void> {
+    try {
+      await this.shell.exec(this.buildCommand('forward', '--remove', `tcp:${hostPort}`), {
+        timeoutMs: TIMEOUTS.SHELL_COMMAND_MS,
+      });
+    } catch {
+      // best-effort
+    }
+  }
+
+  /**
+   * Build the `adb shell am instrument` command for launching the helper.
+   * Returns the full command string — caller is responsible for executing it
+   * (typically as a long-lived background process via the shell executor).
+   */
+  buildInstrumentCommand(testPackage: string, runner: string): string {
+    return this.buildShellCommand(`${ADB_COMMANDS_EXT.AM_INSTRUMENT} ${testPackage}/${runner}`);
+  }
+
+  // -----------------------------------------------------------------------
   // Retry helper
   // -----------------------------------------------------------------------
 

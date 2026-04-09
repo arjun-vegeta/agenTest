@@ -227,6 +227,15 @@ export const ADB_COMMANDS_EXT = {
   EMU: 'emu',
   NETWORK_SPEED: 'network speed',
   NETWORK_DELAY: 'network delay',
+  INSTALL: 'install',
+  INSTALL_REPLACE: '-r',
+  INSTALL_TEST: '-t',
+  UNINSTALL: 'uninstall',
+  FORWARD: 'forward',
+  FORWARD_REMOVE: 'forward --remove',
+  AM_INSTRUMENT: 'am instrument -w -r',
+  PM_LIST_PKGS: 'pm list packages',
+  DUMPSYS_PACKAGE: 'dumpsys package',
 } as const;
 
 /**
@@ -362,6 +371,50 @@ export const GRPC = {
   RELEASE_PRESSURE: 0,
   /** Default multitouch finger identifier */
   DEFAULT_FINGER_ID: 0,
+} as const;
+
+// ---------------------------------------------------------------------------
+// On-device Helper APK (Phase 3)
+// ---------------------------------------------------------------------------
+
+/**
+ * Constants for the LazyTest on-device helper. The helper APK runs inside an
+ * `am instrument` process on the device and exposes UiAutomation primitives
+ * over a localhost HTTP server. The host TypeScript MCP server reaches it via
+ * `adb forward`. See android-helper/ for the source.
+ */
+export const HELPER = {
+  /** Main APK package name. */
+  PACKAGE: 'com.lazytest.helper',
+  /** Test APK package name (the one `am instrument` targets). */
+  TEST_PACKAGE: 'com.lazytest.helper.test',
+  /** AndroidJUnitRunner full class — what `am instrument` invokes. */
+  RUNNER: 'androidx.test.runner.AndroidJUnitRunner',
+  /** Port the helper binds to inside the device. */
+  DEVICE_PORT: 8765,
+  /**
+   * Host port to use for `adb forward`. Distinct from DEVICE_PORT so a
+   * developer can run a normal local server on 8765 without colliding.
+   */
+  HOST_PORT: 8765,
+  /** Filenames in android-helper/prebuilt/ shipped with the npm package. */
+  MAIN_APK_FILENAME: 'lazytest-helper.apk',
+  TEST_APK_FILENAME: 'lazytest-helper-test.apk',
+  /**
+   * Minimum versionCode the helper APK must have for the host to accept it.
+   * Bump in lockstep with android-helper/app/build.gradle.kts versionCode.
+   */
+  MIN_VERSION_CODE: 1,
+  /** The protocol version the host expects. Must match HelperServer.PROTOCOL_VERSION. */
+  EXPECTED_PROTOCOL_VERSION: 1,
+  /** How long to wait for the helper /status endpoint to come up after launch (ms). */
+  STARTUP_TIMEOUT_MS: 30_000,
+  /** Poll interval while waiting for /status (ms). */
+  STARTUP_POLL_MS: 250,
+  /** Default request timeout for non-blocking helper endpoints (ms). */
+  REQUEST_TIMEOUT_MS: 10_000,
+  /** Timeout for /wait-idle (longer because it can legitimately block). */
+  WAIT_IDLE_TIMEOUT_MS: 30_000,
 } as const;
 
 /** Maps Android KEYCODE_* strings to W3C key values for gRPC sendKey */
