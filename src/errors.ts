@@ -66,3 +66,20 @@ export class TreeParseError extends LazyTestError {
     this.name = 'TreeParseError';
   }
 }
+
+export class GrpcConnectionError extends LazyTestError {
+  constructor(message: string) {
+    super(message, 'GRPC_CONNECTION_ERROR');
+    this.name = 'GrpcConnectionError';
+  }
+}
+
+export class GrpcRpcError extends LazyTestError {
+  constructor(
+    message: string,
+    public readonly rpcMethod: string,
+  ) {
+    super(message, 'GRPC_RPC_ERROR');
+    this.name = 'GrpcRpcError';
+  }
+}

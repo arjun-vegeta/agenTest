@@ -299,3 +299,46 @@ export const SYSTEM_PACKAGES = [
   'android',
   'com.android.settings',
 ] as const;
+
+// ---------------------------------------------------------------------------
+// gRPC Emulator Backend
+// ---------------------------------------------------------------------------
+
+export const GRPC = {
+  /** gRPC port = emulator console port + this offset */
+  PORT_OFFSET: 3000,
+  /** Connection timeout for initial gRPC health check (ms) */
+  CONNECT_TIMEOUT_MS: 5_000,
+  /** Deadline for individual RPC calls (ms) */
+  RPC_DEADLINE_MS: 10_000,
+  /** Target FPS for swipe touch interpolation */
+  SWIPE_FPS: 60,
+  /** Touch pressure value for finger-down events */
+  DEFAULT_PRESSURE: 100,
+  /** Touch pressure value for finger-up (release) events */
+  RELEASE_PRESSURE: 0,
+  /** Default multitouch finger identifier */
+  DEFAULT_FINGER_ID: 0,
+} as const;
+
+/** Maps Android KEYCODE_* strings to W3C key values for gRPC sendKey */
+export const KEYCODE_TO_W3C: Readonly<Record<string, string>> = {
+  KEYCODE_BACK: 'GoBack',
+  KEYCODE_HOME: 'GoHome',
+  KEYCODE_APP_SWITCH: 'AppSwitch',
+  KEYCODE_ENTER: 'Enter',
+  KEYCODE_DEL: 'Backspace',
+  KEYCODE_FORWARD_DEL: 'Delete',
+  KEYCODE_TAB: 'Tab',
+  KEYCODE_ESCAPE: 'Escape',
+  KEYCODE_SPACE: ' ',
+  KEYCODE_DPAD_UP: 'ArrowUp',
+  KEYCODE_DPAD_DOWN: 'ArrowDown',
+  KEYCODE_DPAD_LEFT: 'ArrowLeft',
+  KEYCODE_DPAD_RIGHT: 'ArrowRight',
+  KEYCODE_MOVE_HOME: 'Home',
+  KEYCODE_MOVE_END: 'End',
+  KEYCODE_PAGE_UP: 'PageUp',
+  KEYCODE_PAGE_DOWN: 'PageDown',
+  KEYCODE_POWER: 'Power',
+} as const;
