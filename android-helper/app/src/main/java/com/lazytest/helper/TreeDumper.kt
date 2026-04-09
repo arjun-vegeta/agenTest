@@ -88,6 +88,35 @@ class TreeDumper(private val uiAutomation: UiAutomation) {
             node.packageName?.toString()?.let { out.put("packageName", it) }
         }
 
+        // Compose-specific enrichment (Phase 3.8). Jetpack Compose maps its
+        // semantics properties onto AccessibilityNodeInfo fields that native
+        // Views rarely use — stateDescription, paneTitle, hintText,
+        // tooltipText — but which are invaluable for understanding Compose
+        // UIs. We surface them as top-level fields so the LLM can match on
+        // "switch is off" or "field has hint 'Email'".
+        //
+        // These getters exist since API 26+ and return null on older APIs.
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            val hint = node.hintText?.toString()
+            if (!hint.isNullOrEmpty()) {
+                out.put(if (compact) "hint" else "hintText", hint)
+            }
+        }
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+            val state = node.stateDescription?.toString()
+            if (!state.isNullOrEmpty()) {
+                out.put(if (compact) "state" else "stateDescription", state)
+            }
+            val pane = node.paneTitle?.toString()
+            if (!pane.isNullOrEmpty()) {
+                out.put(if (compact) "pane" else "paneTitle", pane)
+            }
+            val tooltip = node.tooltipText?.toString()
+            if (!tooltip.isNullOrEmpty()) {
+                out.put(if (compact) "tooltip" else "tooltipText", tooltip)
+            }
+        }
+
         // Geometry — always present.
         out.put("bounds", "[${rect.left},${rect.top}][${rect.right},${rect.bottom}]")
 
