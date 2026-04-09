@@ -32,6 +32,7 @@ export interface EmulatorDiscovery {
  * location varies by OS and configuration:
  * - macOS: ~/Library/Caches/TemporaryItems/avd/running/
  * - Linux: /tmp/android-$USER/avd/running/
+ * - Windows: %LOCALAPPDATA%\Temp\avd\running\ (and %TEMP% as fallback)
  * - Fallback: $TMPDIR/avd/running/
  */
 function getDiscoveryDirs(): string[] {
@@ -50,7 +51,20 @@ function getDiscoveryDirs(): string[] {
     }
   }
 
-  // Always try $TMPDIR as fallback
+  if (platform() === 'win32') {
+    // Windows emulator writes to %LOCALAPPDATA%\Temp\avd\running\
+    // (and sometimes %TEMP%\avd\running\ depending on emulator version)
+    const localAppData = process.env['LOCALAPPDATA'];
+    if (localAppData) {
+      dirs.push(join(localAppData, 'Temp', 'avd', 'running'));
+    }
+    const winTemp = process.env['TEMP'];
+    if (winTemp) {
+      dirs.push(join(winTemp, 'avd', 'running'));
+    }
+  }
+
+  // Always try $TMPDIR / os.tmpdir() as fallback
   dirs.push(join(tmpdir(), 'avd', 'running'));
 
   return dirs;
