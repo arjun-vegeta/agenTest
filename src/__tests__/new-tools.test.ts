@@ -3,7 +3,10 @@ import { AdbClient } from '../android/adb.js';
 import { LOGCAT } from '../constants.js';
 import { handleDeviceInfo } from '../tools/device-info.js';
 import { handleGetLogs } from '../tools/get-logs.js';
+import { handleGetSharedPrefs } from '../tools/get-shared-prefs.js';
+import { handleQueryDb } from '../tools/query-db.js';
 import { handleScreenshot } from '../tools/screenshot.js';
+import { handleSetNetwork } from '../tools/set-network.js';
 import { MockShellExecutor } from './mock-shell.js';
 
 // ---------------------------------------------------------------------------
@@ -326,5 +329,151 @@ describe('ADB system dialog detection', () => {
 
     const dialogs = await adb.detectSystemDialogs(tree);
     expect(dialogs).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// lazytest_get_shared_prefs
+// ---------------------------------------------------------------------------
+
+describe('handleGetSharedPrefs', () => {
+  it('reads a shared_prefs XML file via run-as', async () => {
+    const shell = new MockShellExecutor();
+    const xml = `<?xml version='1.0' encoding='utf-8' standalone='yes' ?>
+<map>
+  <string name="user_token">abc123</string>
+  <boolean name="onboarding_complete" value="true" />
+</map>`;
+    shell.when('run-as com.example.myapp cat shared_prefs/my_prefs.xml', xml);
+
+    const result = await handleGetSharedPrefs(shell, 'com.example.myapp', 'my_prefs.xml');
+
+    expect(result.packageName).toBe('com.example.myapp');
+    expect(result.file).toBe('my_prefs.xml');
+    expect(result.content).toContain('user_token');
+    expect(result.content).toContain('abc123');
+  });
+
+  it('auto-appends .xml extension if missing', async () => {
+    const shell = new MockShellExecutor();
+    shell.when('shared_prefs/my_prefs.xml', '<map/>');
+
+    await handleGetSharedPrefs(shell, 'com.example.myapp', 'my_prefs');
+
+    // Verify the command referenced my_prefs.xml
+    const calls = shell.getCallsMatching('shared_prefs/my_prefs.xml');
+    expect(calls.length).toBeGreaterThan(0);
+  });
+
+  it('throws a clear error when app is not debuggable', async () => {
+    const shell = new MockShellExecutor();
+    // Simulate run-as failure by making mock throw
+    const origExec = shell.exec.bind(shell);
+    shell.exec = async (cmd: string): Promise<string> => {
+      if (cmd.includes('run-as')) {
+        throw new Error('run-as: package not debuggable: com.example.myapp');
+      }
+      return origExec(cmd);
+    };
+
+    await expect(handleGetSharedPrefs(shell, 'com.example.myapp', 'my_prefs.xml')).rejects.toThrow(
+      /debuggable build/,
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// lazytest_query_db
+// ---------------------------------------------------------------------------
+
+describe('handleQueryDb', () => {
+  it('runs a SQL query via run-as sqlite3', async () => {
+    const shell = new MockShellExecutor();
+    shell.when(
+      'run-as com.example.myapp sqlite3 databases/app.db',
+      '1|alice|alice@test.com\n2|bob|bob@test.com\n',
+    );
+
+    const result = await handleQueryDb(
+      shell,
+      'com.example.myapp',
+      'app.db',
+      'SELECT id, name, email FROM users',
+    );
+
+    expect(result.database).toBe('app.db');
+    expect(result.query).toContain('SELECT');
+    expect(result.rows).toContain('alice');
+    expect(result.rows).toContain('bob');
+  });
+
+  it('escapes single quotes in query', async () => {
+    const shell = new MockShellExecutor();
+    shell.when('sqlite3', '');
+
+    await handleQueryDb(
+      shell,
+      'com.example.myapp',
+      'app.db',
+      "SELECT * FROM users WHERE name = 'alice'",
+    );
+
+    const calls = shell.getCalls();
+    // Query with escaped quotes should appear in the command
+    expect(calls.some((c) => c.includes("'\\''alice'\\''"))).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// lazytest_set_network
+// ---------------------------------------------------------------------------
+
+describe('handleSetNetwork', () => {
+  it('sets a network speed preset', async () => {
+    const shell = new MockShellExecutor();
+    shell.when('emu network speed 3g', '');
+
+    const result = await handleSetNetwork(shell, { preset: '3g' });
+
+    expect(result.applied.preset).toBe('3g');
+    expect(result.message).toContain('3g');
+    expect(shell.getCallsMatching('emu network speed 3g')).toHaveLength(1);
+  });
+
+  it('offline preset disables wifi and data', async () => {
+    const shell = new MockShellExecutor();
+    shell.when('svc wifi disable', '');
+    shell.when('svc data disable', '');
+
+    const result = await handleSetNetwork(shell, { preset: 'offline' });
+
+    expect(result.applied.preset).toBe('offline');
+    expect(result.applied.wifi).toBe(false);
+    expect(shell.getCallsMatching('svc wifi disable')).toHaveLength(1);
+    expect(shell.getCallsMatching('svc data disable')).toHaveLength(1);
+  });
+
+  it('sets custom speed and delay', async () => {
+    const shell = new MockShellExecutor();
+    shell.when('emu network speed 500:2000', '');
+    shell.when('emu network delay 100:300', '');
+
+    const result = await handleSetNetwork(shell, {
+      speed: '500:2000',
+      delay: '100:300',
+    });
+
+    expect(result.applied.speed).toBe('500:2000');
+    expect(result.applied.delay).toBe('100:300');
+  });
+
+  it('toggles airplane mode', async () => {
+    const shell = new MockShellExecutor();
+    shell.when('cmd connectivity airplane-mode enable', '');
+
+    const result = await handleSetNetwork(shell, { airplaneMode: true });
+
+    expect(result.applied.airplaneMode).toBe(true);
+    expect(shell.getCallsMatching('airplane-mode enable')).toHaveLength(1);
   });
 });
