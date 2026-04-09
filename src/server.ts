@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
+import type { FrameworkSync } from './android/framework-sync.js';
 import type { GrpcEmulatorClient } from './android/grpc-client.js';
 import type { HelperHandle } from './android/helper-installer.js';
 import { LOGCAT, SERVER_NAME, SERVER_VERSION, TOOL_NAMES, TOOL_NAMES_EXT } from './constants.js';
@@ -36,6 +37,9 @@ let activeGrpcClient: GrpcEmulatorClient | undefined;
 /** Tracks the active on-device helper handle (HTTP client + instrument process) */
 let activeHelper: HelperHandle | undefined;
 
+/** Tracks the active framework sync backend (Hermes CDP / Dart VM Service) */
+let activeSync: FrameworkSync | undefined;
+
 // ---------------------------------------------------------------------------
 // MCP Server
 // ---------------------------------------------------------------------------
@@ -51,7 +55,7 @@ const server = new McpServer({
 
 server.tool(
   TOOL_NAMES.CONNECT,
-  'Connect to an Android emulator/device and launch the app. Returns the initial UI accessibility tree.',
+  'Connect to an Android emulator/device and launch the app. Returns the initial UI accessibility tree. Pass verbose:true to include a step-by-step framework-sync trace in the response — useful for debugging why Hermes CDP / Dart VM Service / the idling bridge failed to attach.',
   {
     packageName: z.string().describe('Android package name (e.g. "com.example.myapp")'),
     deviceId: z
@@ -66,8 +70,14 @@ server.tool(
       .describe(
         'Input backend: "auto" (default) tries gRPC then falls back to ADB; "adb" forces ADB only; "grpc" requires gRPC (emulator only, fails if unavailable).',
       ),
+    verbose: z
+      .boolean()
+      .optional()
+      .describe(
+        'Include a step-by-step `diagnostics` array in the response showing each framework-detection + sync-attach step. Off by default to save tokens — `framework` and `frameworkSync` alone tell you what succeeded. Turn on when something unexpected happens and you need to see which step failed.',
+      ),
   },
-  async ({ packageName, deviceId, backend }) => {
+  async ({ packageName, deviceId, backend, verbose }) => {
     try {
       const result = await handleConnect(
         shell,
@@ -76,11 +86,23 @@ server.tool(
         backend ?? 'auto',
         activeGrpcClient,
         activeHelper,
+        activeSync,
       );
       activeDeviceId = result.deviceId;
       activePackageName = packageName;
       activeGrpcClient = result.grpcClient;
       activeHelper = result.helper;
+      activeSync = result.sync;
+
+      // Diagnostics policy: saved ~2-4k tokens per flow during debugging
+      // but on the happy path they restate what `framework` and
+      // `frameworkSync` already say. Surface them only when the caller
+      // explicitly asks (verbose:true) OR when something unexpected
+      // happened that the LLM would want to explain to the developer.
+      const anomalyDetected =
+        result.framework === undefined ||
+        (result.warnings !== undefined && result.warnings.length > 0);
+      const includeDiagnostics = verbose === true || anomalyDetected;
 
       return {
         content: [
@@ -93,6 +115,9 @@ server.tool(
                 backend: result.backend,
                 helperInstalled: result.helperInstalled,
                 framework: result.framework,
+                frameworkSync: result.frameworkSync,
+                warnings: result.warnings,
+                diagnostics: includeDiagnostics ? result.diagnostics : undefined,
                 uiTree: result.uiTree,
               },
               null,
@@ -172,6 +197,7 @@ Use *_coordinates variants (x,y from bounds) for unlabeled icons. Use clear_text
         activeDeviceId,
         activeGrpcClient,
         activeHelper?.client,
+        activeSync,
       );
 
       return {
@@ -219,6 +245,7 @@ server.tool(
         activeDeviceId,
         activeGrpcClient,
         activeHelper?.client,
+        activeSync,
       );
 
       return {
