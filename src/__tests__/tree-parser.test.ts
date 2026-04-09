@@ -258,7 +258,8 @@ describe('serializeTreeForLlm', () => {
     const xml = loadFixture('login-screen.xml');
     const tree = parseUiAutomatorXml(xml);
     const emails = findElements(tree, { id: 'email' });
-    const serialized = serializeTreeForLlm(emails[0]!);
+    expect(emails[0]).toBeDefined();
+    const serialized = serializeTreeForLlm(emails[0] ?? tree);
 
     // Should have: id, role, text, bounds, focused, actions
     expect(serialized.id).toBe('com.example.myapp:id/email');
@@ -279,7 +280,8 @@ describe('serializeTreeForLlm', () => {
     const xml = loadFixture('login-screen.xml');
     const tree = parseUiAutomatorXml(xml);
     const passwords = findElements(tree, { id: 'password' });
-    const serialized = serializeTreeForLlm(passwords[0]!);
+    expect(passwords[0]).toBeDefined();
+    const serialized = serializeTreeForLlm(passwords[0] ?? tree);
 
     expect(serialized.password).toBe(true);
   });
@@ -290,6 +292,6 @@ describe('serializeTreeForLlm', () => {
     const serialized = serializeTreeForLlm(tree);
 
     expect(serialized.children).toBeDefined();
-    expect(serialized.children!.length).toBeGreaterThan(0);
+    expect(serialized.children?.length).toBeGreaterThan(0);
   });
 });

@@ -252,10 +252,56 @@ export function parseUiAutomatorXml(xml: string): UnifiedUINode {
 }
 
 // ---------------------------------------------------------------------------
-// LLM-friendly serialization (compact JSON)
+// LLM-friendly serialization (compact JSON) with tree pruning
 // ---------------------------------------------------------------------------
 
-export function serializeTreeForLlm(node: UnifiedUINode): LlmTreeNode {
+/** System UI packages to exclude from the LLM tree */
+const SYSTEM_UI_PACKAGES = new Set(['com.android.systemui']);
+
+/**
+ * Check if a node should be excluded from the LLM tree entirely.
+ */
+function shouldPruneNode(node: UnifiedUINode): boolean {
+  // Remove system UI (status bar, navigation bar)
+  if (SYSTEM_UI_PACKAGES.has(node.packageName)) return true;
+
+  // Remove zero-size / invisible elements
+  const width = node.bounds.right - node.bounds.left;
+  const height = node.bounds.bottom - node.bounds.top;
+  if (width <= 0 || height <= 0) return true;
+
+  // Remove completely off-screen elements
+  if (node.bounds.right <= 0 || node.bounds.bottom <= 0) return true;
+
+  return false;
+}
+
+/**
+ * Check if a node is an empty wrapper that should be collapsed.
+ * A wrapper is a container with no identifying info, not interactive,
+ * and has exactly one child — the child should replace it.
+ */
+function isEmptyWrapper(node: UnifiedUINode): boolean {
+  if (node.children.length !== 1) return false;
+  if (node.resourceId || node.text || node.description) return false;
+  if (node.clickable || node.scrollable || node.checkable) return false;
+  if (node.role !== UNIFIED_ROLES.CONTAINER && node.role !== UNIFIED_ROLES.UNKNOWN) return false;
+  return true;
+}
+
+/**
+ * Serialize a node, collapsing wrapper chains.
+ * Walks down single-child wrapper chains and serializes the first meaningful node.
+ */
+function resolveNode(node: UnifiedUINode): UnifiedUINode {
+  let current = node;
+  while (isEmptyWrapper(current) && current.children[0]) {
+    current = current.children[0];
+  }
+  return current;
+}
+
+function serializeNode(node: UnifiedUINode): LlmTreeNode {
   const result: LlmTreeNode = {
     role: node.role,
     bounds: `[${node.bounds.left},${node.bounds.top}][${node.bounds.right},${node.bounds.bottom}]`,
@@ -266,6 +312,15 @@ export function serializeTreeForLlm(node: UnifiedUINode): LlmTreeNode {
   if (node.text) result.text = node.text;
   if (node.description) result.desc = node.description;
 
+  // For unlabeled elements, include short class name so the AI can identify them
+  const hasLabel = node.resourceId || node.text || node.description;
+  if (!hasLabel) {
+    const shortClass = node.className.split('.').pop() ?? node.className;
+    if (shortClass && shortClass !== 'View' && shortClass !== 'ViewGroup') {
+      result.cls = shortClass;
+    }
+  }
+
   // Only include non-default state flags
   if (!node.enabled) result.enabled = false;
   if (node.checked) result.checked = true;
@@ -273,15 +328,37 @@ export function serializeTreeForLlm(node: UnifiedUINode): LlmTreeNode {
   if (node.selected) result.selected = true;
   if (node.password) result.password = true;
 
+  // For unlabeled tappable elements, explicitly flag as clickable
+  if (node.clickable && !hasLabel) result.clickable = true;
+
+  // Flag scrollable containers
+  if (node.scrollable) result.scrollable = true;
+
   // Include actions if any
   if (node.actions.length > 0) result.actions = node.actions;
 
-  // Recurse children
+  // Recurse children with pruning
   if (node.children.length > 0) {
-    result.children = node.children.map(serializeTreeForLlm);
+    const serializedChildren: LlmTreeNode[] = [];
+    for (const child of node.children) {
+      // Skip invisible/system nodes
+      if (shouldPruneNode(child)) continue;
+      // Collapse wrapper chains
+      const resolved = resolveNode(child);
+      if (shouldPruneNode(resolved)) continue;
+      serializedChildren.push(serializeNode(resolved));
+    }
+    if (serializedChildren.length > 0) {
+      result.children = serializedChildren;
+    }
   }
 
   return result;
+}
+
+export function serializeTreeForLlm(node: UnifiedUINode): LlmTreeNode {
+  const resolved = resolveNode(node);
+  return serializeNode(resolved);
 }
 
 // ---------------------------------------------------------------------------
@@ -359,7 +436,12 @@ function matchesSelector(
   if (selector.textContains !== undefined && !node.text.includes(selector.textContains)) {
     return false;
   }
-  if (selector.className !== undefined && node.className !== selector.className) {
+  if (
+    selector.className !== undefined &&
+    node.className !== selector.className &&
+    !node.className.endsWith(`.${selector.className}`) &&
+    !node.className.includes(selector.className)
+  ) {
     return false;
   }
   if (selector.description !== undefined && !node.description.includes(selector.description)) {
