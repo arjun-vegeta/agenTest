@@ -3,6 +3,7 @@ import {
   ADB_COMMANDS,
   ADB_COMMANDS_EXT,
   ANDROID_PROPS,
+  IDLING_BRIDGE,
   KEYCODES,
   LOGCAT,
   MONKEY_FLAGS,
@@ -550,6 +551,68 @@ export class AdbClient {
    */
   buildInstrumentCommand(testPackage: string, runner: string): string {
     return this.buildShellCommand(`${ADB_COMMANDS_EXT.AM_INSTRUMENT} ${testPackage}/${runner}`);
+  }
+
+  // -----------------------------------------------------------------------
+  // LazyTest Idling Bridge (Phase 3.10)
+  // -----------------------------------------------------------------------
+
+  /**
+   * Query the opt-in LazyTest idling bridge ContentProvider (if the user's
+   * app includes the `lazytest-idling-bridge` AAR). Returns `null` when the
+   * provider is absent, unresolvable, or `content query` failed — callers
+   * treat null as "no idle bridge attached, skip this sync channel".
+   *
+   * Wire format (from `LazyTestIdlingProvider`):
+   *   `Row: 0 idle_count=<N>, idle_names=<csv>, version=<N>`
+   *
+   * The `content query` CLI is available since API 21. Output is a series
+   * of `Row: <N> col=val, col=val, ...` lines. We parse the first row only.
+   *
+   * The returned `version` comes straight from the bridge's cursor so
+   * callers can detect stale AARs (user updated LazyTest via npm but hasn't
+   * rebuilt their app to pick up the new AAR from node_modules).
+   */
+  async queryIdlingBridge(
+    packageName: string,
+  ): Promise<{ idleCount: number; busy: string[]; version: number } | null> {
+    const authority = `${packageName}${IDLING_BRIDGE.AUTHORITY_SUFFIX}`;
+    const uri = `content://${authority}/${IDLING_BRIDGE.QUERY_PATH}`;
+    let output: string;
+    try {
+      output = await this.shell.exec(
+        this.buildShellCommand(`${ADB_COMMANDS_EXT.CONTENT_QUERY} --uri ${uri}`),
+        { timeoutMs: IDLING_BRIDGE.QUERY_TIMEOUT_MS },
+      );
+    } catch {
+      return null;
+    }
+
+    const firstRow = output
+      .split('\n')
+      .map((line) => line.trim())
+      .find((line) => line.startsWith('Row:'));
+    if (!firstRow) {
+      // `content query` prints "No result found." when the provider is
+      // unregistered — same as absent for our purposes.
+      return null;
+    }
+
+    // Row: 0 idle_count=2, idle_names=NetworkIdling,DbIdling, version=1
+    const match = /idle_count=(\d+).*?idle_names=([^,]*(?:,[^,]*)*?),\s*version=(\d+)/.exec(
+      firstRow,
+    );
+    if (!match) {
+      return null;
+    }
+    const idleCount = Number(match[1]);
+    const busyCsv = match[2] ?? '';
+    const version = Number(match[3]);
+    const busy = busyCsv
+      .split(',')
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
+    return { idleCount, busy, version };
   }
 
   // -----------------------------------------------------------------------
