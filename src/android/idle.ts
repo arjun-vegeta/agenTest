@@ -78,7 +78,9 @@ export async function waitForIdle(
 }
 
 /**
- * Fast path: event-driven idle via the on-device helper.
+ * Fast path: event-driven idle via the on-device helper, optionally
+ * augmented by a framework-specific sync probe (Hermes CDP for React
+ * Native, Dart VM Service for Flutter — see `framework-sync.ts`).
  */
 async function waitForIdleFast(device: DeviceClient, opts: IdleOptions): Promise<IdleResult> {
   // Block on the helper's event-driven /wait-idle. If it returns false (no
@@ -87,6 +89,19 @@ async function waitForIdleFast(device: DeviceClient, opts: IdleOptions): Promise
   if (!idle) {
     return waitForIdleByPolling(device, opts);
   }
+
+  // Framework sync tail probe (Phase 3.9). Runs after the a11y-event idle
+  // so it only adds latency when there's actual pending JS/Dart work. Any
+  // failure is non-fatal — we treat the helper's idle signal as authoritative
+  // and the framework sync as a best-effort augmentation.
+  if (device.sync) {
+    try {
+      await device.sync.waitForSync();
+    } catch {
+      // ignore — helper idle already confirmed UI work is done
+    }
+  }
+
   // Always grab a fresh tree after the wait — UI may have changed since the
   // last event but before we polled.
   const tree = await snapshotTree(device);

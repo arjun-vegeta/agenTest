@@ -19,6 +19,7 @@
 import { KEYCODE_TO_W3C } from '../constants.js';
 import type { DeviceInfo, ShellExecutor, SystemDialog, UnifiedUINode } from '../types.js';
 import { AdbClient } from './adb.js';
+import type { FrameworkSync } from './framework-sync.js';
 import type { GrpcEmulatorClient } from './grpc-client.js';
 import { GrpcKeyEventType } from './grpc-types.js';
 import {
@@ -46,11 +47,26 @@ export class DeviceClient {
     private readonly grpc?: GrpcEmulatorClient,
     strictGrpc = false,
     private readonly helper?: HelperClient,
+    private readonly frameworkSync?: FrameworkSync,
   ) {
     this.adb = new AdbClient(shell, deviceId);
     this.grpcHealthy = grpc?.isConnected() ?? false;
     this.helperHealthy = helper !== undefined;
     this.strictGrpc = strictGrpc;
+  }
+
+  /**
+   * Expose the internal AdbClient so framework backends (Dart VM Service
+   * discovery, idling-bridge queries) can reuse the same device connection
+   * without re-threading the shell executor.
+   */
+  get adbClient(): AdbClient {
+    return this.adb;
+  }
+
+  /** The framework sync backend bound to this session, if any. */
+  get sync(): FrameworkSync | undefined {
+    return this.frameworkSync;
   }
 
   /**
