@@ -3,6 +3,7 @@ import { serializeTreeForLlm } from '../android/tree-parser.js';
 import { DeviceClient, type ActiveBackend } from '../android/device-client.js';
 import { GrpcEmulatorClient } from '../android/grpc-client.js';
 import { discoverEmulatorToken } from '../android/grpc-discovery.js';
+import { ensureHelper, type HelperHandle } from '../android/helper-installer.js';
 import { GRPC } from '../constants.js';
 import { GrpcConnectionError } from '../errors.js';
 import type { ShellExecutor } from '../types.js';
@@ -15,8 +16,14 @@ export interface ConnectResult {
   uiTree: ReturnType<typeof serializeTreeForLlm>;
   /** Which backend is active for input injection. */
   backend: ActiveBackend;
+  /** Whether the on-device helper APK is installed and serving. */
+  helperInstalled: boolean;
+  /** The framework detected for the launched app, if helper is available. */
+  framework?: 'flutter' | 'react_native' | 'compose' | 'native';
   /** The gRPC client, stored in server state for subsequent tool calls. */
   grpcClient?: GrpcEmulatorClient;
+  /** The helper handle, stored in server state for subsequent tool calls. */
+  helper?: HelperHandle;
 }
 
 /**
@@ -34,10 +41,14 @@ export async function handleConnect(
   deviceId?: string,
   backend: BackendOption = 'auto',
   existingGrpcClient?: GrpcEmulatorClient,
+  existingHelper?: HelperHandle,
 ): Promise<ConnectResult> {
-  // Close any existing gRPC client from a previous session
+  // Tear down any clients from a previous session
   if (existingGrpcClient) {
     existingGrpcClient.close();
+  }
+  if (existingHelper) {
+    await existingHelper.shutdown();
   }
 
   const device = new DeviceClient(shell, deviceId);
@@ -83,25 +94,49 @@ export async function handleConnect(
     }
   }
 
-  // Create the device client with gRPC if available
-  const deviceWithGrpc = new DeviceClient(
+  // Auto-install + launch the on-device helper APK in parallel with the
+  // app launch. Zero user input required — the prebuilt APKs ship with the
+  // npm package and we install them silently if they're missing or stale.
+  // If anything goes wrong we just degrade to the ADB+gRPC path with a log.
+  const helper = await ensureHelper(shell, resolvedDeviceId).catch((err: unknown) => {
+    console.error(
+      `[lazytest] helper install failed, continuing with ADB/gRPC: ${err instanceof Error ? err.message : String(err)}`,
+    );
+    return null;
+  });
+
+  // Create the device client with gRPC + helper if available
+  const deviceFull = new DeviceClient(
     shell,
     resolvedDeviceId,
     grpcClient,
     backend === 'grpc', // strictGrpc: throw on gRPC failure instead of falling back
+    helper?.client,
   );
 
   // Launch the app
-  await deviceWithGrpc.launchApp(packageName);
+  await deviceFull.launchApp(packageName);
 
-  // Wait for UI to settle (with loading indicator detection)
-  const idleResult = await waitForIdle(deviceWithGrpc);
+  // Wait for UI to settle (helper-fast event-driven path when available,
+  // polling fallback otherwise — both with loading indicator detection)
+  const idleResult = await waitForIdle(deviceFull);
+
+  // Detect framework if the helper is available — this informs the LLM what
+  // kind of app it's testing so it can adjust selector strategies.
+  let framework: ConnectResult['framework'];
+  if (helper) {
+    const info = await deviceFull.detectFramework(packageName);
+    framework = info?.primary;
+  }
 
   return {
     deviceId: resolvedDeviceId,
     packageName,
     uiTree: serializeTreeForLlm(idleResult.tree),
-    backend: deviceWithGrpc.backend,
+    backend: deviceFull.backend,
+    helperInstalled: helper !== null,
+    framework,
     grpcClient,
+    helper: helper ?? undefined,
   };
 }

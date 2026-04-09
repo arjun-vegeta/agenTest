@@ -2,6 +2,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 import type { GrpcEmulatorClient } from './android/grpc-client.js';
+import type { HelperHandle } from './android/helper-installer.js';
 import { LOGCAT, SERVER_NAME, SERVER_VERSION, TOOL_NAMES, TOOL_NAMES_EXT } from './constants.js';
 import { LazyTestError } from './errors.js';
 import { ProcessShellExecutor } from './shell.js';
@@ -31,6 +32,9 @@ let activePackageName: string | undefined;
 
 /** Tracks the active gRPC client for emulator input injection */
 let activeGrpcClient: GrpcEmulatorClient | undefined;
+
+/** Tracks the active on-device helper handle (HTTP client + instrument process) */
+let activeHelper: HelperHandle | undefined;
 
 // ---------------------------------------------------------------------------
 // MCP Server
@@ -71,10 +75,12 @@ server.tool(
         deviceId,
         backend ?? 'auto',
         activeGrpcClient,
+        activeHelper,
       );
       activeDeviceId = result.deviceId;
       activePackageName = packageName;
       activeGrpcClient = result.grpcClient;
+      activeHelper = result.helper;
 
       return {
         content: [
@@ -85,6 +91,8 @@ server.tool(
                 deviceId: result.deviceId,
                 packageName: result.packageName,
                 backend: result.backend,
+                helperInstalled: result.helperInstalled,
+                framework: result.framework,
                 uiTree: result.uiTree,
               },
               null,
@@ -109,7 +117,12 @@ server.tool(
   {},
   async () => {
     try {
-      const result = await handleGetUiTree(shell, activeDeviceId, activeGrpcClient);
+      const result = await handleGetUiTree(
+        shell,
+        activeDeviceId,
+        activeGrpcClient,
+        activeHelper?.client,
+      );
 
       return {
         content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
@@ -153,7 +166,13 @@ Use *_coordinates variants (x,y from bounds) for unlabeled icons. Use clear_text
   },
   async ({ steps }) => {
     try {
-      const result = await handleRunFlow(shell, steps, activeDeviceId, activeGrpcClient);
+      const result = await handleRunFlow(
+        shell,
+        steps,
+        activeDeviceId,
+        activeGrpcClient,
+        activeHelper?.client,
+      );
 
       return {
         content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
@@ -194,7 +213,13 @@ server.tool(
     }
 
     try {
-      const result = await handleResetApp(shell, pkg, activeDeviceId, activeGrpcClient);
+      const result = await handleResetApp(
+        shell,
+        pkg,
+        activeDeviceId,
+        activeGrpcClient,
+        activeHelper?.client,
+      );
 
       return {
         content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
@@ -241,7 +266,14 @@ server.tool(
     }
 
     try {
-      const result = await handleGetLogs(shell, pkg, maxLines, activeDeviceId, activeGrpcClient);
+      const result = await handleGetLogs(
+        shell,
+        pkg,
+        maxLines,
+        activeDeviceId,
+        activeGrpcClient,
+        activeHelper?.client,
+      );
       return {
         content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
       };
@@ -261,7 +293,12 @@ server.tool(
   {},
   async () => {
     try {
-      const result = await handleScreenshot(shell, activeDeviceId, activeGrpcClient);
+      const result = await handleScreenshot(
+        shell,
+        activeDeviceId,
+        activeGrpcClient,
+        activeHelper?.client,
+      );
       return {
         content: [{ type: 'text', text: JSON.stringify(result) }],
       };
@@ -281,7 +318,12 @@ server.tool(
   {},
   async () => {
     try {
-      const result = await handleDeviceInfo(shell, activeDeviceId, activeGrpcClient);
+      const result = await handleDeviceInfo(
+        shell,
+        activeDeviceId,
+        activeGrpcClient,
+        activeHelper?.client,
+      );
       return {
         content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
       };
@@ -322,7 +364,14 @@ server.tool(
     }
 
     try {
-      const result = await handleGetSharedPrefs(shell, pkg, file, activeDeviceId, activeGrpcClient);
+      const result = await handleGetSharedPrefs(
+        shell,
+        pkg,
+        file,
+        activeDeviceId,
+        activeGrpcClient,
+        activeHelper?.client,
+      );
       return {
         content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
       };
@@ -371,6 +420,7 @@ server.tool(
         query,
         activeDeviceId,
         activeGrpcClient,
+        activeHelper?.client,
       );
       return {
         content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
@@ -410,7 +460,13 @@ Also: toggle wifi and airplaneMode explicitly.`,
   },
   async (input) => {
     try {
-      const result = await handleSetNetwork(shell, input, activeDeviceId, activeGrpcClient);
+      const result = await handleSetNetwork(
+        shell,
+        input,
+        activeDeviceId,
+        activeGrpcClient,
+        activeHelper?.client,
+      );
       return {
         content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
       };
