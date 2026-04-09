@@ -110,6 +110,10 @@ export const TIMEOUTS = {
   LONG_PRESS_DURATION_MS: 1_000,
   /** Delay after tapping a text field to let keyboard animate in (ms) */
   KEYBOARD_SETTLE_MS: 300,
+  /** Default pinch gesture duration (ms) */
+  PINCH_DURATION_MS: 300,
+  /** Default rotate gesture duration (ms) */
+  ROTATE_DURATION_MS: 400,
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -196,6 +200,9 @@ export const TOOL_NAMES_EXT = {
   GET_LOGS: 'lazytest_get_logs',
   SCREENSHOT: 'lazytest_screenshot',
   DEVICE_INFO: 'lazytest_device_info',
+  GET_SHARED_PREFS: 'lazytest_get_shared_prefs',
+  QUERY_DB: 'lazytest_query_db',
+  SET_NETWORK: 'lazytest_set_network',
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -210,7 +217,43 @@ export const ADB_COMMANDS_EXT = {
   WM_SIZE: 'wm size',
   WM_DENSITY: 'wm density',
   GETPROP: 'getprop',
+  RUN_AS: 'run-as',
+  SQLITE3: 'sqlite3',
+  SHARED_PREFS_DIR: 'shared_prefs',
+  DATABASES_DIR: 'databases',
+  SVC_WIFI: 'svc wifi',
+  SVC_DATA: 'svc data',
+  AIRPLANE_MODE: 'cmd connectivity airplane-mode',
+  EMU: 'emu',
+  NETWORK_SPEED: 'network speed',
+  NETWORK_DELAY: 'network delay',
 } as const;
+
+/**
+ * Valid presets for `adb emu network speed`.
+ * See: https://developer.android.com/studio/run/emulator-networking
+ */
+export const NETWORK_SPEED_PRESETS = [
+  'gsm', // 14.4/14.4 kbps
+  'gprs', // 28.8/57.6 kbps
+  'edge', // 236.8/473.6 kbps
+  'umts', // 384/384 kbps
+  '3g', // same as umts
+  'hsdpa', // 5.76/14.4 Mbps
+  'lte', // 58/173 Mbps
+  'full', // unlimited
+] as const;
+
+/** Valid presets for `adb emu network delay` (latency). */
+export const NETWORK_DELAY_PRESETS = [
+  'none', // 0ms
+  'gprs', // 150-550ms
+  'edge', // 80-400ms
+  'umts', // 35-200ms
+] as const;
+
+export type NetworkSpeedPreset = (typeof NETWORK_SPEED_PRESETS)[number];
+export type NetworkDelayPreset = (typeof NETWORK_DELAY_PRESETS)[number];
 
 export const ANDROID_PROPS = {
   SDK_VERSION: 'ro.build.version.sdk',

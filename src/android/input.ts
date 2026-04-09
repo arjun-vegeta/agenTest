@@ -150,6 +150,20 @@ export async function executeAction(
       break;
     }
 
+    case 'pinch': {
+      const duration = step.durationMs ?? TIMEOUTS.PINCH_DURATION_MS;
+      await adb.pinch(step.cx, step.cy, step.startRadius, step.endRadius, duration);
+      break;
+    }
+
+    case 'rotate': {
+      const duration = step.durationMs ?? TIMEOUTS.ROTATE_DURATION_MS;
+      const startRad = (step.startAngleDeg * Math.PI) / 180;
+      const endRad = (step.endAngleDeg * Math.PI) / 180;
+      await adb.rotate(step.cx, step.cy, step.radius, startRad, endRad, duration);
+      break;
+    }
+
     case 'wait': {
       await sleep(step.timeoutMs);
       break;

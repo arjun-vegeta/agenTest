@@ -266,6 +266,40 @@ const ScrollToSchema = z.object({
     .describe('Max scroll attempts before failing (default: 10)'),
 });
 
+const PinchStepSchema = z.object({
+  action: z.literal('pinch'),
+  cx: z.number().describe('Pinch center X in screen pixels'),
+  cy: z.number().describe('Pinch center Y in screen pixels'),
+  startRadius: z.number().positive().describe('Initial distance from center to each finger'),
+  endRadius: z
+    .number()
+    .positive()
+    .describe(
+      'Final distance: startRadius > endRadius = pinch-in (zoom out); startRadius < endRadius = pinch-out (zoom in)',
+    ),
+  durationMs: z
+    .number()
+    .int()
+    .positive()
+    .optional()
+    .describe('Gesture duration in milliseconds (default: 300)'),
+});
+
+const RotateStepSchema = z.object({
+  action: z.literal('rotate'),
+  cx: z.number().describe('Rotation center X in screen pixels'),
+  cy: z.number().describe('Rotation center Y in screen pixels'),
+  radius: z.number().positive().describe('Distance from center to each finger'),
+  startAngleDeg: z.number().describe('Starting angle in degrees (0 = right, 90 = down)'),
+  endAngleDeg: z.number().describe('Ending angle in degrees'),
+  durationMs: z
+    .number()
+    .int()
+    .positive()
+    .optional()
+    .describe('Gesture duration in milliseconds (default: 400)'),
+});
+
 export const ActionStepSchema = z.discriminatedUnion('action', [
   TapStepSchema,
   TapCoordinatesStepSchema,
@@ -278,6 +312,8 @@ export const ActionStepSchema = z.discriminatedUnion('action', [
   DoubleTapCoordinatesStepSchema,
   ClearTextStepSchema,
   PressKeyStepSchema,
+  PinchStepSchema,
+  RotateStepSchema,
   WaitStepSchema,
   WaitForStableStepSchema,
   AssertVisibleSchema,

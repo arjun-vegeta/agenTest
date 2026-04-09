@@ -9,7 +9,13 @@ import type { DeviceInfo, ShellExecutor, SystemDialog, UnifiedUINode } from '../
 import { AdbClient } from './adb.js';
 import type { GrpcEmulatorClient } from './grpc-client.js';
 import { GrpcKeyEventType } from './grpc-types.js';
-import { performLongPress, performSwipe, performTap } from './grpc-touch.js';
+import {
+  performLongPress,
+  performPinch,
+  performRotate,
+  performSwipe,
+  performTap,
+} from './grpc-touch.js';
 
 export type ActiveBackend = 'grpc' | 'adb';
 
@@ -87,6 +93,51 @@ export class DeviceClient {
       }
     }
     await this.adb.longPress(x, y, durationMs);
+  }
+
+  /** Multi-touch pinch gesture — gRPC only (ADB has no multi-touch). */
+  async pinch(
+    cx: number,
+    cy: number,
+    startRadius: number,
+    endRadius: number,
+    durationMs: number,
+  ): Promise<void> {
+    const g = this.getGrpc();
+    if (!g) {
+      throw new Error(
+        'Pinch gesture requires gRPC backend (emulator only). ADB does not support multi-touch.',
+      );
+    }
+    try {
+      await performPinch(g, cx, cy, startRadius, endRadius, durationMs);
+    } catch (err) {
+      this.handleGrpcFailure('pinch', err);
+      throw err;
+    }
+  }
+
+  /** Multi-touch rotate gesture — gRPC only. */
+  async rotate(
+    cx: number,
+    cy: number,
+    radius: number,
+    startAngleRad: number,
+    endAngleRad: number,
+    durationMs: number,
+  ): Promise<void> {
+    const g = this.getGrpc();
+    if (!g) {
+      throw new Error(
+        'Rotate gesture requires gRPC backend (emulator only). ADB does not support multi-touch.',
+      );
+    }
+    try {
+      await performRotate(g, cx, cy, radius, startAngleRad, endAngleRad, durationMs);
+    } catch (err) {
+      this.handleGrpcFailure('rotate', err);
+      throw err;
+    }
   }
 
   async keyEvent(keycode: string): Promise<void> {
@@ -168,6 +219,38 @@ export class DeviceClient {
 
   async detectSystemDialogs(tree: UnifiedUINode): Promise<SystemDialog[]> {
     return this.adb.detectSystemDialogs(tree);
+  }
+
+  // App state inspection (always ADB — uses run-as)
+
+  async getSharedPrefs(packageName: string, file: string): Promise<string> {
+    return this.adb.getSharedPrefs(packageName, file);
+  }
+
+  async queryDatabase(packageName: string, database: string, query: string): Promise<string> {
+    return this.adb.queryDatabase(packageName, database, query);
+  }
+
+  // Network simulation (always ADB — uses adb emu / svc)
+
+  async setNetworkSpeed(speed: string): Promise<void> {
+    return this.adb.setNetworkSpeed(speed);
+  }
+
+  async setNetworkDelay(delay: string): Promise<void> {
+    return this.adb.setNetworkDelay(delay);
+  }
+
+  async setWifi(enabled: boolean): Promise<void> {
+    return this.adb.setWifi(enabled);
+  }
+
+  async setMobileData(enabled: boolean): Promise<void> {
+    return this.adb.setMobileData(enabled);
+  }
+
+  async setAirplaneMode(enabled: boolean): Promise<void> {
+    return this.adb.setAirplaneMode(enabled);
   }
 
   // -------------------------------------------------------------------------
