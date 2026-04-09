@@ -46,26 +46,69 @@ export interface IdleResult {
 // ---------------------------------------------------------------------------
 
 /**
- * Poll the UI tree until it stabilizes AND loading indicators disappear.
+ * Wait for the UI to settle and return a fresh tree.
  *
- * Phase 1: Poll until tree fingerprint is stable (2 consecutive matches).
- * Phase 2: If stable tree contains loading indicators (ProgressBar, shimmer, etc.),
- *          keep polling until they disappear or maxLoadingWaitMs is exceeded.
+ * Two execution paths:
+ *
+ *   FAST PATH (helper available):
+ *     1. Call helper /wait-idle — pushes events from UiAutomation. Typical
+ *        latency 150-300ms.
+ *     2. Pull a fresh tree via helper /tree (still much faster than dump+cat).
+ *     3. Run loading-indicator pass on the fresh tree.
+ *
+ *   POLLING PATH (helper unavailable):
+ *     1. Poll uiautomator dump every 200ms.
+ *     2. Fingerprint compare; declare stable when 2 consecutive snapshots
+ *        match.
+ *     3. Loading-indicator pass.
+ *
+ * The fast path is preferred whenever DeviceClient.hasHelper is true. It
+ * collapses what was 1-2 seconds of polling into ~250ms.
  */
 export async function waitForIdle(
-  adb: DeviceClient,
+  device: DeviceClient,
   options?: Partial<IdleOptions>,
 ): Promise<IdleResult> {
   const opts = { ...DEFAULT_IDLE_OPTIONS, ...options };
+
+  if (device.hasHelper) {
+    return waitForIdleFast(device, opts);
+  }
+  return waitForIdleByPolling(device, opts);
+}
+
+/**
+ * Fast path: event-driven idle via the on-device helper.
+ */
+async function waitForIdleFast(device: DeviceClient, opts: IdleOptions): Promise<IdleResult> {
+  // Block on the helper's event-driven /wait-idle. If it returns false (no
+  // helper / unhealthy / etc) fall back to polling.
+  const idle = await device.waitForIdleViaHelper(opts.timeoutMs);
+  if (!idle) {
+    return waitForIdleByPolling(device, opts);
+  }
+  // Always grab a fresh tree after the wait — UI may have changed since the
+  // last event but before we polled.
+  const tree = await snapshotTree(device);
+
+  if (opts.waitForLoadingIndicators) {
+    return waitForLoadingToFinish(device, tree, opts);
+  }
+  return { tree, loadingDetected: false };
+}
+
+/**
+ * Polling path: legacy fingerprint-stability detection. Used when the
+ * on-device helper isn't installed (gracefully degraded mode).
+ */
+async function waitForIdleByPolling(device: DeviceClient, opts: IdleOptions): Promise<IdleResult> {
   const startTime = Date.now();
   let previousFingerprint: string | null = null;
   let stableCount = 0;
   let lastTree: UnifiedUINode | null = null;
 
-  // Phase 1: Wait for tree to stabilize
   while (Date.now() - startTime < opts.timeoutMs) {
-    const xml = await adb.dumpUiTree();
-    const tree = parseUiAutomatorXml(xml);
+    const tree = await snapshotTree(device);
     const fingerprint = computeFingerprint(tree);
 
     if (previousFingerprint !== null && fingerprint === previousFingerprint) {
@@ -87,20 +130,20 @@ export async function waitForIdle(
     throw new IdleTimeoutError(opts.timeoutMs);
   }
 
-  // Phase 2: If loading indicators present, wait for them to disappear
   if (opts.waitForLoadingIndicators) {
-    const loadingResult = await waitForLoadingToFinish(adb, lastTree, opts);
-    return loadingResult;
+    return waitForLoadingToFinish(device, lastTree, opts);
   }
-
   return { tree: lastTree, loadingDetected: false };
 }
 
 /**
- * Take a single snapshot without waiting for idle.
+ * Take a single snapshot without waiting for idle. Prefers the helper's
+ * /tree endpoint when available, falls back to ADB uiautomator dump.
  */
-export async function snapshotTree(adb: DeviceClient): Promise<UnifiedUINode> {
-  const xml = await adb.dumpUiTree();
+export async function snapshotTree(device: DeviceClient): Promise<UnifiedUINode> {
+  const fast = await device.dumpUiTreeFast();
+  if (fast) return fast;
+  const xml = await device.dumpUiTree();
   return parseUiAutomatorXml(xml);
 }
 
@@ -186,10 +229,10 @@ function collectLoadingIndicators(node: UnifiedUINode, results: string[]): void 
 
 /**
  * After tree stabilizes, if loading indicators are present, keep polling
- * until they disappear or timeout.
+ * until they disappear or timeout. Uses helper-fast snapshots when available.
  */
 async function waitForLoadingToFinish(
-  adb: DeviceClient,
+  device: DeviceClient,
   stableTree: UnifiedUINode,
   opts: IdleOptions,
 ): Promise<IdleResult> {
@@ -202,20 +245,16 @@ async function waitForLoadingToFinish(
   const description = indicators.join(', ');
   const loadingStartTime = Date.now();
 
-  // Poll until loading indicators disappear
   while (Date.now() - loadingStartTime < opts.maxLoadingWaitMs) {
     await sleep(IDLE_LOADING.LOADING_POLL_INTERVAL_MS);
 
-    const xml = await adb.dumpUiTree();
-    const tree = parseUiAutomatorXml(xml);
+    const tree = await snapshotTree(device);
     const currentIndicators = detectLoadingIndicators(tree);
 
     if (currentIndicators.length === 0) {
-      // Loading finished — do one more stability check
+      // Loading finished — do one more stability check.
       await sleep(opts.pollIntervalMs);
-      const finalXml = await adb.dumpUiTree();
-      const finalTree = parseUiAutomatorXml(finalXml);
-
+      const finalTree = await snapshotTree(device);
       return {
         tree: finalTree,
         loadingDetected: true,
@@ -224,9 +263,8 @@ async function waitForLoadingToFinish(
     }
   }
 
-  // Timeout — loading indicators still present, return whatever we have
-  const xml = await adb.dumpUiTree();
-  const finalTree = parseUiAutomatorXml(xml);
+  // Timeout — loading indicators still present, return whatever we have.
+  const finalTree = await snapshotTree(device);
   return {
     tree: finalTree,
     loadingDetected: true,

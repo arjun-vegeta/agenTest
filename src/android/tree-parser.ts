@@ -198,6 +198,97 @@ function convertNode(raw: RawXmlNode, pathPrefix: string): UnifiedUINode {
 }
 
 // ---------------------------------------------------------------------------
+// Helper JSON tree shape (from on-device helper APK /tree endpoint)
+// ---------------------------------------------------------------------------
+
+/** Raw JSON shape returned by HelperServer's /tree endpoint (full mode). */
+export interface HelperJsonNode {
+  id?: string;
+  class?: string;
+  text?: string;
+  description?: string;
+  packageName?: string;
+  bounds: string;
+  enabled?: boolean;
+  checked?: boolean;
+  checkable?: boolean;
+  focused?: boolean;
+  selected?: boolean;
+  clickable?: boolean;
+  longClickable?: boolean;
+  scrollable?: boolean;
+  password?: boolean;
+  children?: HelperJsonNode[];
+}
+
+export interface HelperTreeResponse {
+  ok: boolean;
+  packageName: string;
+  compact: boolean;
+  tree: HelperJsonNode;
+}
+
+/**
+ * Convert the helper APK's JSON tree directly to UnifiedUINode, skipping the
+ * XML parsing path entirely. The helper produces this JSON in-process from
+ * AccessibilityNodeInfo, ~5-10x faster than `uiautomator dump`.
+ */
+export function parseHelperJsonTree(json: HelperTreeResponse): UnifiedUINode {
+  if (!json.ok) {
+    throw new TreeParseError('Helper /tree returned ok=false');
+  }
+  return convertHelperNode(json.tree, '', 0);
+}
+
+function convertHelperNode(raw: HelperJsonNode, pathPrefix: string, index: number): UnifiedUINode {
+  const id = pathPrefix ? `${pathPrefix}.${index}` : String(index);
+  const bounds = parseBounds(raw.bounds);
+  const className = raw.class ?? '';
+  const clickable = raw.clickable ?? false;
+  const longClickable = raw.longClickable ?? false;
+  const scrollable = raw.scrollable ?? false;
+  const checkable = raw.checkable ?? false;
+
+  const actions: UnifiedAction[] = [];
+  if (clickable) actions.push(UNIFIED_ACTIONS.TAP);
+  if (longClickable) actions.push(UNIFIED_ACTIONS.LONG_PRESS);
+  if (scrollable) actions.push(UNIFIED_ACTIONS.SCROLL);
+  if (checkable) actions.push(UNIFIED_ACTIONS.CHECK);
+  if (className === ANDROID_CLASSES.EDIT_TEXT) actions.push(UNIFIED_ACTIONS.TYPE);
+  if (className === ANDROID_CLASSES.SEEK_BAR) actions.push(UNIFIED_ACTIONS.ADJUST);
+
+  const node: UnifiedUINode = {
+    id,
+    resourceId: raw.id ?? '',
+    className,
+    role: mapClassToRole(className),
+    text: raw.text ?? '',
+    description: raw.description ?? '',
+    packageName: raw.packageName ?? '',
+    bounds,
+    center: boundsCenter(bounds),
+    index,
+    enabled: raw.enabled ?? true,
+    focused: raw.focused ?? false,
+    selected: raw.selected ?? false,
+    checked: raw.checked ?? false,
+    checkable,
+    clickable,
+    scrollable,
+    longClickable,
+    password: raw.password ?? false,
+    actions,
+    children: [],
+  };
+
+  if (raw.children && raw.children.length > 0) {
+    node.children = raw.children.map((child, i) => convertHelperNode(child, id, i));
+  }
+
+  return node;
+}
+
+// ---------------------------------------------------------------------------
 // Public API: parse full XML → UnifiedUINode tree
 // ---------------------------------------------------------------------------
 
