@@ -8,10 +8,13 @@ import { ProcessShellExecutor } from './shell.js';
 import { handleConnect } from './tools/connect.js';
 import { handleDeviceInfo } from './tools/device-info.js';
 import { handleGetLogs } from './tools/get-logs.js';
+import { handleGetSharedPrefs } from './tools/get-shared-prefs.js';
 import { handleGetUiTree } from './tools/get-ui-tree.js';
+import { handleQueryDb } from './tools/query-db.js';
 import { handleResetApp } from './tools/reset-app.js';
 import { handleRunFlow } from './tools/run-flow.js';
 import { handleScreenshot } from './tools/screenshot.js';
+import { handleSetNetwork } from './tools/set-network.js';
 import { ActionStepSchema } from './types.js';
 
 // ---------------------------------------------------------------------------
@@ -279,6 +282,135 @@ server.tool(
   async () => {
     try {
       const result = await handleDeviceInfo(shell, activeDeviceId, activeGrpcClient);
+      return {
+        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+      };
+    } catch (err) {
+      return formatError(err);
+    }
+  },
+);
+
+// ---------------------------------------------------------------------------
+// Tool: lazytest_get_shared_prefs
+// ---------------------------------------------------------------------------
+
+server.tool(
+  TOOL_NAMES_EXT.GET_SHARED_PREFS,
+  'Read a SharedPreferences XML file from the app. Use to verify stored state (tokens, user info, settings). Requires a debuggable build.',
+  {
+    file: z.string().describe('SharedPreferences filename (e.g. "my_prefs.xml" or "my_prefs")'),
+    packageName: z
+      .string()
+      .optional()
+      .describe('Package name. Defaults to the last connected app.'),
+  },
+  async ({ file, packageName }) => {
+    const pkg = packageName ?? activePackageName;
+    if (!pkg) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({
+              error:
+                'No package name provided and no app currently connected. Call lazytest_connect first.',
+            }),
+          },
+        ],
+      };
+    }
+
+    try {
+      const result = await handleGetSharedPrefs(shell, pkg, file, activeDeviceId, activeGrpcClient);
+      return {
+        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+      };
+    } catch (err) {
+      return formatError(err);
+    }
+  },
+);
+
+// ---------------------------------------------------------------------------
+// Tool: lazytest_query_db
+// ---------------------------------------------------------------------------
+
+server.tool(
+  TOOL_NAMES_EXT.QUERY_DB,
+  'Run a SQL query against an app SQLite database (including Room). Use to verify DB state after test actions. Requires a debuggable build.',
+  {
+    database: z.string().describe('Database filename (e.g. "app.db")'),
+    query: z.string().describe('SQL query (e.g. "SELECT * FROM users LIMIT 10")'),
+    packageName: z
+      .string()
+      .optional()
+      .describe('Package name. Defaults to the last connected app.'),
+  },
+  async ({ database, query, packageName }) => {
+    const pkg = packageName ?? activePackageName;
+    if (!pkg) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({
+              error:
+                'No package name provided and no app currently connected. Call lazytest_connect first.',
+            }),
+          },
+        ],
+      };
+    }
+
+    try {
+      const result = await handleQueryDb(
+        shell,
+        pkg,
+        database,
+        query,
+        activeDeviceId,
+        activeGrpcClient,
+      );
+      return {
+        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+      };
+    } catch (err) {
+      return formatError(err);
+    }
+  },
+);
+
+// ---------------------------------------------------------------------------
+// Tool: lazytest_set_network
+// ---------------------------------------------------------------------------
+
+server.tool(
+  TOOL_NAMES_EXT.SET_NETWORK,
+  `Simulate network conditions on the emulator for testing offline/slow connections.
+
+Presets: "full" (unlimited), "lte" (58/173 Mbps), "3g" (384 kbps), "edge" (237/474 kbps), "gsm" (14 kbps), "gprs" (29/58 kbps), "offline" (wifi + data off).
+Latency presets: "none", "gprs" (150-550ms), "edge" (80-400ms), "umts" (35-200ms).
+Custom: "speed" as "up:down" kbps, "delay" as "min:max" ms.
+Also: toggle wifi and airplaneMode explicitly.`,
+  {
+    preset: z
+      .string()
+      .optional()
+      .describe(
+        'Speed preset: gsm/gprs/edge/umts/3g/hsdpa/lte/full, or "offline" to disable all network',
+      ),
+    speed: z.string().optional().describe('Custom speed as "up:down" kbps (e.g. "100:1000")'),
+    delay: z
+      .string()
+      .optional()
+      .describe('Latency: preset (none/gprs/edge/umts) or custom "min:max" ms'),
+    wifi: z.boolean().optional().describe('Enable/disable WiFi'),
+    airplaneMode: z.boolean().optional().describe('Enable/disable airplane mode'),
+  },
+  async (input) => {
+    try {
+      const result = await handleSetNetwork(shell, input, activeDeviceId, activeGrpcClient);
       return {
         content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
       };
