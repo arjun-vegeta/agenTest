@@ -1,7 +1,7 @@
 import { DIFF_THRESHOLDS, IDLE_LOADING, LOADING_INDICATORS, TIMEOUTS } from '../constants.js';
 import { IdleTimeoutError } from '../errors.js';
 import type { UnifiedUINode } from '../types.js';
-import type { AdbClient } from './adb.js';
+import type { DeviceClient } from './device-client.js';
 import { parseUiAutomatorXml } from './tree-parser.js';
 
 // ---------------------------------------------------------------------------
@@ -53,7 +53,7 @@ export interface IdleResult {
  *          keep polling until they disappear or maxLoadingWaitMs is exceeded.
  */
 export async function waitForIdle(
-  adb: AdbClient,
+  adb: DeviceClient,
   options?: Partial<IdleOptions>,
 ): Promise<IdleResult> {
   const opts = { ...DEFAULT_IDLE_OPTIONS, ...options };
@@ -99,7 +99,7 @@ export async function waitForIdle(
 /**
  * Take a single snapshot without waiting for idle.
  */
-export async function snapshotTree(adb: AdbClient): Promise<UnifiedUINode> {
+export async function snapshotTree(adb: DeviceClient): Promise<UnifiedUINode> {
   const xml = await adb.dumpUiTree();
   return parseUiAutomatorXml(xml);
 }
@@ -118,36 +118,63 @@ export function detectLoadingIndicators(root: UnifiedUINode): string[] {
   return found;
 }
 
+/**
+ * Check if a node is actually visible on screen.
+ * React Native apps often have ProgressBar-like components in the tree
+ * that are zero-sized, disabled, or off-screen — not real spinners.
+ */
+function isVisibleIndicator(node: UnifiedUINode): boolean {
+  const width = node.bounds.right - node.bounds.left;
+  const height = node.bounds.bottom - node.bounds.top;
+
+  // Zero or negative size — hidden/collapsed
+  if (width <= 0 || height <= 0) return false;
+
+  // Very small (< 5x5 px) — likely hidden
+  if (width < 5 || height < 5) return false;
+
+  // Completely off-screen
+  if (node.bounds.right <= 0 || node.bounds.bottom <= 0) return false;
+
+  // Disabled elements are often decorative
+  if (!node.enabled) return false;
+
+  return true;
+}
+
 function collectLoadingIndicators(node: UnifiedUINode, results: string[]): void {
-  // Check class name exact match
-  if (LOADING_INDICATORS.CLASS_NAMES.includes(node.className)) {
-    results.push(`${node.className} at [${node.bounds.left},${node.bounds.top}]`);
-  }
+  // Only consider nodes that are actually visible on screen
+  if (isVisibleIndicator(node)) {
+    // Check class name exact match
+    if (LOADING_INDICATORS.CLASS_NAMES.includes(node.className)) {
+      results.push(`${node.className} at [${node.bounds.left},${node.bounds.top}]`);
+    }
 
-  // Check class name fragments
-  if (
-    !LOADING_INDICATORS.CLASS_NAMES.includes(node.className) &&
-    LOADING_INDICATORS.CLASS_FRAGMENTS.some((f) => node.className.includes(f))
-  ) {
-    results.push(`${node.className} at [${node.bounds.left},${node.bounds.top}]`);
-  }
+    // Check class name fragments
+    if (
+      !LOADING_INDICATORS.CLASS_NAMES.includes(node.className) &&
+      LOADING_INDICATORS.CLASS_FRAGMENTS.some((f) => node.className.includes(f))
+    ) {
+      results.push(`${node.className} at [${node.bounds.left},${node.bounds.top}]`);
+    }
 
-  // Check text patterns
-  if (node.text) {
-    for (const pattern of LOADING_INDICATORS.TEXT_PATTERNS) {
-      if (pattern.test(node.text)) {
-        results.push(`text "${node.text}" at [${node.bounds.left},${node.bounds.top}]`);
-        break;
+    // Check text patterns
+    if (node.text) {
+      for (const pattern of LOADING_INDICATORS.TEXT_PATTERNS) {
+        if (pattern.test(node.text)) {
+          results.push(`text "${node.text}" at [${node.bounds.left},${node.bounds.top}]`);
+          break;
+        }
       }
     }
-  }
 
-  // Check description patterns
-  if (node.description) {
-    for (const pattern of LOADING_INDICATORS.DESC_PATTERNS) {
-      if (pattern.test(node.description)) {
-        results.push(`desc "${node.description}" at [${node.bounds.left},${node.bounds.top}]`);
-        break;
+    // Check description patterns
+    if (node.description) {
+      for (const pattern of LOADING_INDICATORS.DESC_PATTERNS) {
+        if (pattern.test(node.description)) {
+          results.push(`desc "${node.description}" at [${node.bounds.left},${node.bounds.top}]`);
+          break;
+        }
       }
     }
   }
@@ -162,7 +189,7 @@ function collectLoadingIndicators(node: UnifiedUINode, results: string[]): void 
  * until they disappear or timeout.
  */
 async function waitForLoadingToFinish(
-  adb: AdbClient,
+  adb: DeviceClient,
   stableTree: UnifiedUINode,
   opts: IdleOptions,
 ): Promise<IdleResult> {

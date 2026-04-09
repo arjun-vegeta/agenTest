@@ -1,11 +1,13 @@
 import { IDLE_LOADING, LIGHTWEIGHT_ACTIONS, SYSTEM_PACKAGES } from '../constants.js';
-import { AdbClient } from '../android/adb.js';
+import { DeviceClient } from '../android/device-client.js';
+import type { GrpcEmulatorClient } from '../android/grpc-client.js';
 import { snapshotTree, waitForIdle } from '../android/idle.js';
-import { checkAssertion, executeAction } from '../android/input.js';
+import { checkAssertion, executeAction, resolveTarget } from '../android/input.js';
 import { serializeTreeForLlm } from '../android/tree-parser.js';
 import type {
   ActionStep,
   Bounds,
+  ElementSelector,
   FlowTrace,
   ShellExecutor,
   StepResult,
@@ -30,6 +32,33 @@ function isScrollToStep(step: ActionStep): boolean {
   return step.action === 'scroll_to';
 }
 
+/**
+ * Extract the target selector from a step, if it has one.
+ * Steps like tap_coordinates, press_key, wait have no target.
+ */
+function getStepTarget(step: ActionStep): ElementSelector | undefined {
+  if ('target' in step && step.target) {
+    return step.target as ElementSelector;
+  }
+  return undefined;
+}
+
+/**
+ * Pre-validate: check if the next step's target exists in the current tree.
+ * Returns true if the target is found or the step has no target.
+ * Returns false if the step has a target that doesn't exist — screen likely changed.
+ */
+function canExecuteNextStep(tree: UnifiedUINode, step: ActionStep): boolean {
+  const target = getStepTarget(step);
+  if (!target) return true;
+  try {
+    resolveTarget(tree, target);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function detectAppCrash(tree: UnifiedUINode, targetPackage: string): boolean {
   if (!targetPackage) return false;
   const currentPackage = tree.packageName;
@@ -42,13 +71,14 @@ export async function handleRunFlow(
   shell: ShellExecutor,
   steps: ActionStep[],
   deviceId?: string,
+  grpcClient?: GrpcEmulatorClient,
 ): Promise<FlowTrace> {
-  const adb = new AdbClient(shell, deviceId);
+  const device = new DeviceClient(shell, deviceId, grpcClient);
   const results: StepResult[] = [];
   const detectedDialogs: SystemDialog[] = [];
 
   // Get initial tree to determine screen bounds and provide context for actions
-  let currentTree = await snapshotTree(adb);
+  let currentTree = await snapshotTree(device);
   const screenBounds: Bounds =
     currentTree.bounds.right > 0 ? currentTree.bounds : DEFAULT_SCREEN_BOUNDS;
 
@@ -56,7 +86,7 @@ export async function handleRunFlow(
   const targetPackage = currentTree.packageName;
 
   // Check for system dialogs on the initial screen
-  const initialDialogs = await adb.detectSystemDialogs(currentTree);
+  const initialDialogs = await device.detectSystemDialogs(currentTree);
   detectedDialogs.push(...initialDialogs);
 
   for (let i = 0; i < steps.length; i++) {
@@ -67,7 +97,7 @@ export async function handleRunFlow(
     try {
       if (isAssertionStep(step)) {
         // For assertions, re-read the tree to get fresh state
-        currentTree = await snapshotTree(adb);
+        currentTree = await snapshotTree(device);
         const assertionResult = checkAssertion(currentTree, step);
 
         results.push({
@@ -92,8 +122,8 @@ export async function handleRunFlow(
         }
       } else if (step.action === 'wait') {
         // Wait steps sleep then re-snapshot the tree so finalUiTree reflects post-wait state
-        await executeAction(adb, currentTree, step, screenBounds);
-        currentTree = await snapshotTree(adb);
+        await executeAction(device, currentTree, step, screenBounds);
+        currentTree = await snapshotTree(device);
 
         results.push({
           stepIndex: i,
@@ -104,7 +134,7 @@ export async function handleRunFlow(
       } else if (step.action === 'wait_for_stable') {
         // Smart wait: polls tree until stable AND loading indicators disappear
         const timeout = step.timeoutMs ?? IDLE_LOADING.MAX_LOADING_WAIT_MS;
-        const idleResult = await waitForIdle(adb, {
+        const idleResult = await waitForIdle(device, {
           timeoutMs: timeout,
           waitForLoadingIndicators: true,
           maxLoadingWaitMs: timeout,
@@ -116,12 +146,12 @@ export async function handleRunFlow(
           action: step,
           success: true,
           durationMs: Date.now() - stepStart,
-          loadingDetected: idleResult.loadingDescription,
+          loadingCompleted: idleResult.loadingDescription,
         });
       } else if (isScrollToStep(step)) {
         // scroll_to handles its own idle/snapshot loop internally
-        await executeAction(adb, currentTree, step, screenBounds);
-        currentTree = await snapshotTree(adb);
+        await executeAction(device, currentTree, step, screenBounds);
+        currentTree = await snapshotTree(device);
 
         results.push({
           stepIndex: i,
@@ -131,8 +161,8 @@ export async function handleRunFlow(
         });
       } else if (LIGHTWEIGHT_ACTIONS.includes(step.action)) {
         // Lightweight action — single snapshot, no idle polling (faster)
-        await executeAction(adb, currentTree, step, screenBounds);
-        currentTree = await snapshotTree(adb);
+        await executeAction(device, currentTree, step, screenBounds);
+        currentTree = await snapshotTree(device);
 
         results.push({
           stepIndex: i,
@@ -142,8 +172,8 @@ export async function handleRunFlow(
         });
       } else {
         // Heavy action (tap, swipe, etc.) — full idle detection with loading awareness
-        await executeAction(adb, currentTree, step, screenBounds);
-        const idleResult = await waitForIdle(adb);
+        await executeAction(device, currentTree, step, screenBounds);
+        const idleResult = await waitForIdle(device);
         currentTree = idleResult.tree;
 
         // Check for app crash (root package changed to system package)
@@ -168,7 +198,7 @@ export async function handleRunFlow(
         }
 
         // Check for system dialogs after each action
-        const dialogs = await adb.detectSystemDialogs(currentTree);
+        const dialogs = await device.detectSystemDialogs(currentTree);
         detectedDialogs.push(...dialogs);
 
         results.push({
@@ -176,7 +206,7 @@ export async function handleRunFlow(
           action: step,
           success: true,
           durationMs: Date.now() - stepStart,
-          loadingDetected: idleResult.loadingDescription,
+          loadingCompleted: idleResult.loadingDescription,
         });
       }
     } catch (err) {
@@ -192,7 +222,7 @@ export async function handleRunFlow(
 
       // Try to get the current tree for debugging, even on failure
       try {
-        currentTree = await snapshotTree(adb);
+        currentTree = await snapshotTree(device);
       } catch {
         // If we can't even snapshot, use whatever we had
       }
@@ -204,6 +234,22 @@ export async function handleRunFlow(
         results,
         finalUiTree: serializeTreeForLlm(currentTree),
         error: `Step ${i} (${step.action}) failed: ${errorMessage}`,
+        systemDialogs: detectedDialogs.length > 0 ? detectedDialogs : undefined,
+      };
+    }
+
+    // Pre-validate: if the next step has a target, check if it exists now.
+    // If the screen changed (e.g., app auto-navigated), fail fast instead of
+    // wasting time on idle detection for a stale target.
+    const nextStep = steps[i + 1];
+    if (nextStep && !canExecuteNextStep(currentTree, nextStep)) {
+      return {
+        success: false,
+        stepsCompleted: i + 1,
+        totalSteps: steps.length,
+        results,
+        finalUiTree: serializeTreeForLlm(currentTree),
+        error: `Screen changed after step ${i} (${step.action}): target for step ${i + 1} (${nextStep.action}) no longer exists. The previous action may have triggered a navigation.`,
         systemDialogs: detectedDialogs.length > 0 ? detectedDialogs : undefined,
       };
     }

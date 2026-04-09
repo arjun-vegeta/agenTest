@@ -299,8 +299,8 @@ export interface StepResult {
   success: boolean;
   durationMs: number;
   error?: string;
-  /** If loading indicators were detected and waited out, describes what was found */
-  loadingDetected?: string;
+  /** If loading indicators were detected, describes what was waited out (loading already finished) */
+  loadingCompleted?: string;
 }
 
 export interface FlowTrace {
@@ -350,12 +350,18 @@ export interface LlmTreeNode {
   role: string;
   text?: string;
   desc?: string;
+  /** Short class name (e.g. "ReactViewGroup") — included for unlabeled elements */
+  cls?: string;
   bounds: string;
+  /** Only included when element is tappable but has no id/text/desc */
+  clickable?: true;
   enabled?: false;
   checked?: true;
   focused?: true;
   selected?: true;
   password?: true;
+  /** Included when element is scrollable */
+  scrollable?: true;
   actions?: string[];
   children?: LlmTreeNode[];
 }

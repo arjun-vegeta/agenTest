@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { AdbClient } from '../android/adb.js';
+import { DeviceClient } from '../android/device-client.js';
 import { detectLoadingIndicators, waitForIdle } from '../android/idle.js';
 import { parseUiAutomatorXml } from '../android/tree-parser.js';
 import type { UnifiedUINode } from '../types.js';
@@ -25,7 +25,7 @@ describe('waitForIdle', () => {
     // Batched command: rm + dump + cat in one call — match on dump, return XML
     shell.when('uiautomator dump', loginXml);
 
-    const adb = new AdbClient(shell);
+    const adb = new DeviceClient(shell);
     const result = await waitForIdle(adb, {
       timeoutMs: 5000,
       pollIntervalMs: 10,
@@ -52,7 +52,7 @@ describe('waitForIdle', () => {
       return callCount % 2 === 0 ? homeXml : loginXml;
     };
 
-    const adb = new AdbClient(shell);
+    const adb = new DeviceClient(shell);
     const result = await waitForIdle(adb, {
       timeoutMs: 200,
       pollIntervalMs: 10,

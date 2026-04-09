@@ -1,7 +1,7 @@
 import { DOUBLE_TAP, SCROLL_TO, SWIPE_OFFSETS, TIMEOUTS } from '../constants.js';
 import { ElementNotFoundError } from '../errors.js';
 import type { ActionStep, Bounds, ElementSelector, UnifiedUINode } from '../types.js';
-import type { AdbClient } from './adb.js';
+import type { DeviceClient } from './device-client.js';
 import { snapshotTree } from './idle.js';
 import { findElements } from './tree-parser.js';
 
@@ -69,7 +69,7 @@ function computeSwipeCoords(
 // ---------------------------------------------------------------------------
 
 export async function executeAction(
-  adb: AdbClient,
+  adb: DeviceClient,
   tree: UnifiedUINode,
   step: ActionStep,
   screenBounds: Bounds,

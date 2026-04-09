@@ -1,4 +1,5 @@
-import { AdbClient } from '../android/adb.js';
+import { DeviceClient } from '../android/device-client.js';
+import type { GrpcEmulatorClient } from '../android/grpc-client.js';
 import { waitForIdle } from '../android/idle.js';
 import { serializeTreeForLlm } from '../android/tree-parser.js';
 import type { LlmTreeNode, ShellExecutor } from '../types.js';
@@ -12,17 +13,18 @@ export async function handleResetApp(
   shell: ShellExecutor,
   packageName: string,
   deviceId?: string,
+  grpcClient?: GrpcEmulatorClient,
 ): Promise<ResetAppResult> {
-  const adb = new AdbClient(shell, deviceId);
+  const device = new DeviceClient(shell, deviceId, grpcClient);
 
   // Force stop the app
-  await adb.forceStopApp(packageName);
+  await device.forceStopApp(packageName);
 
   // Relaunch
-  await adb.launchApp(packageName);
+  await device.launchApp(packageName);
 
   // Wait for UI to settle (with loading indicator detection)
-  const idleResult = await waitForIdle(adb);
+  const idleResult = await waitForIdle(device);
 
   return {
     packageName,

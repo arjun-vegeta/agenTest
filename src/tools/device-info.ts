@@ -1,10 +1,12 @@
-import { AdbClient } from '../android/adb.js';
+import { DeviceClient } from '../android/device-client.js';
+import type { GrpcEmulatorClient } from '../android/grpc-client.js';
 import type { DeviceInfo, ShellExecutor } from '../types.js';
 
 export async function handleDeviceInfo(
   shell: ShellExecutor,
   deviceId?: string,
+  grpcClient?: GrpcEmulatorClient,
 ): Promise<DeviceInfo> {
-  const adb = new AdbClient(shell, deviceId);
-  return adb.getDeviceInfo();
+  const device = new DeviceClient(shell, deviceId, grpcClient);
+  return device.getDeviceInfo();
 }

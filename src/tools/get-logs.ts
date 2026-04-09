@@ -1,4 +1,5 @@
-import { AdbClient } from '../android/adb.js';
+import { DeviceClient } from '../android/device-client.js';
+import type { GrpcEmulatorClient } from '../android/grpc-client.js';
 import type { ShellExecutor } from '../types.js';
 
 export interface GetLogsResult {
@@ -11,9 +12,10 @@ export async function handleGetLogs(
   packageName: string,
   maxLines?: number,
   deviceId?: string,
+  grpcClient?: GrpcEmulatorClient,
 ): Promise<GetLogsResult> {
-  const adb = new AdbClient(shell, deviceId);
-  const logs = await adb.getAppLogs(packageName, maxLines);
+  const device = new DeviceClient(shell, deviceId, grpcClient);
+  const logs = await device.getAppLogs(packageName, maxLines);
 
   return {
     packageName,

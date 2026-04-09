@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
+import type { GrpcEmulatorClient } from './android/grpc-client.js';
 import { LOGCAT, SERVER_NAME, SERVER_VERSION, TOOL_NAMES, TOOL_NAMES_EXT } from './constants.js';
 import { LazyTestError } from './errors.js';
 import { ProcessShellExecutor } from './shell.js';
@@ -24,6 +25,9 @@ let activeDeviceId: string | undefined;
 
 /** Tracks the active package name once connected */
 let activePackageName: string | undefined;
+
+/** Tracks the active gRPC client for emulator input injection */
+let activeGrpcClient: GrpcEmulatorClient | undefined;
 
 // ---------------------------------------------------------------------------
 // MCP Server
@@ -49,15 +53,42 @@ server.tool(
       .describe(
         'Specific device/emulator ID from "adb devices". Omit to use the first connected device.',
       ),
+    backend: z
+      .enum(['auto', 'adb', 'grpc'])
+      .optional()
+      .describe(
+        'Input backend: "auto" (default) tries gRPC then falls back to ADB; "adb" forces ADB only; "grpc" requires gRPC (emulator only, fails if unavailable).',
+      ),
   },
-  async ({ packageName, deviceId }) => {
+  async ({ packageName, deviceId, backend }) => {
     try {
-      const result = await handleConnect(shell, packageName, deviceId);
+      const result = await handleConnect(
+        shell,
+        packageName,
+        deviceId,
+        backend ?? 'auto',
+        activeGrpcClient,
+      );
       activeDeviceId = result.deviceId;
       activePackageName = packageName;
+      activeGrpcClient = result.grpcClient;
 
       return {
-        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(
+              {
+                deviceId: result.deviceId,
+                packageName: result.packageName,
+                backend: result.backend,
+                uiTree: result.uiTree,
+              },
+              null,
+              2,
+            ),
+          },
+        ],
       };
     } catch (err) {
       return formatError(err);
@@ -75,7 +106,7 @@ server.tool(
   {},
   async () => {
     try {
-      const result = await handleGetUiTree(shell, activeDeviceId);
+      const result = await handleGetUiTree(shell, activeDeviceId, activeGrpcClient);
 
       return {
         content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
@@ -92,15 +123,25 @@ server.tool(
 
 server.tool(
   TOOL_NAMES.RUN_FLOW,
-  `Execute a batch of UI actions and assertions. Stops on first failure.
+  `Execute a batch of UI actions and assertions. Stops on first failure. Returns the final UI tree after all steps complete (or at point of failure).
 
-CRITICAL: You almost NEVER need "wait" or "wait_for_stable" steps. The server automatically waits after EVERY action for: (1) the UI to settle, (2) all loading spinners, progress bars, shimmers, and skeleton screens to disappear. Just send your actions back-to-back — the server handles all timing and synchronization. Only use "wait" as a last resort if the app has no visible loading indicator but you know it needs time (rare).
+DO NOT add "wait" or "wait_for_stable" steps. The server automatically waits after EVERY action for the UI to settle and all loading indicators to disappear. Adding wait steps wastes time. If you need to check the screen state, just call get_ui_tree instead.
+
+If a step causes the app to navigate (e.g., auto-submit), the server detects that the next step's target is gone and returns immediately with the new screen — you can then re-plan.
 
 ACTIONS: tap, tap_coordinates, type, clear_text, swipe, swipe_coordinates, long_press, long_press_coordinates, double_tap, double_tap_coordinates, press_key, scroll_to.
 ASSERTIONS: assert_visible, assert_not_visible, assert_text_equals, assert_text_contains.
 
-Selectors: id (resource-id substring), text (exact), textContains (partial), className, description, index.
-Use *_coordinates variants (x,y pixels) for unlabeled icons. Use clear_text before type to overwrite existing text. Use scroll_to to find elements off-screen.`,
+SELECTORS (all are flexible matching):
+- id: substring match against resource-id ("email" matches "com.app:id/email")
+- text: exact match against visible text
+- textContains: substring match against visible text
+- className: matches full name OR short name ("EditText" matches "android.widget.EditText")
+- description: substring match against content-desc ("ira" matches "ira, Last seen today at 6:24 PM")
+- index: pick the Nth match (0-based)
+
+The tree uses "cls" field for short class names (e.g. "ReactEditText") — you can use this directly in the className selector.
+Use *_coordinates variants (x,y from bounds) for unlabeled icons. Use clear_text before type to overwrite existing text.`,
   {
     steps: z
       .array(ActionStepSchema)
@@ -109,7 +150,7 @@ Use *_coordinates variants (x,y pixels) for unlabeled icons. Use clear_text befo
   },
   async ({ steps }) => {
     try {
-      const result = await handleRunFlow(shell, steps, activeDeviceId);
+      const result = await handleRunFlow(shell, steps, activeDeviceId, activeGrpcClient);
 
       return {
         content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
@@ -150,7 +191,7 @@ server.tool(
     }
 
     try {
-      const result = await handleResetApp(shell, pkg, activeDeviceId);
+      const result = await handleResetApp(shell, pkg, activeDeviceId, activeGrpcClient);
 
       return {
         content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
@@ -197,7 +238,7 @@ server.tool(
     }
 
     try {
-      const result = await handleGetLogs(shell, pkg, maxLines, activeDeviceId);
+      const result = await handleGetLogs(shell, pkg, maxLines, activeDeviceId, activeGrpcClient);
       return {
         content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
       };
@@ -217,7 +258,7 @@ server.tool(
   {},
   async () => {
     try {
-      const result = await handleScreenshot(shell, activeDeviceId);
+      const result = await handleScreenshot(shell, activeDeviceId, activeGrpcClient);
       return {
         content: [{ type: 'text', text: JSON.stringify(result) }],
       };
@@ -237,7 +278,7 @@ server.tool(
   {},
   async () => {
     try {
-      const result = await handleDeviceInfo(shell, activeDeviceId);
+      const result = await handleDeviceInfo(shell, activeDeviceId, activeGrpcClient);
       return {
         content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
       };
