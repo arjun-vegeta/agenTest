@@ -92,6 +92,10 @@ describe('detectLoadingIndicators', () => {
       scrollable: false,
       longClickable: false,
       password: false,
+      hintText: '',
+      stateDescription: '',
+      paneTitle: '',
+      tooltipText: '',
       actions: [],
       children: [],
     };
@@ -122,6 +126,10 @@ describe('detectLoadingIndicators', () => {
       scrollable: false,
       longClickable: false,
       password: false,
+      hintText: '',
+      stateDescription: '',
+      paneTitle: '',
+      tooltipText: '',
       actions: [],
       children: [],
     };
@@ -152,6 +160,10 @@ describe('detectLoadingIndicators', () => {
       scrollable: false,
       longClickable: false,
       password: false,
+      hintText: '',
+      stateDescription: '',
+      paneTitle: '',
+      tooltipText: '',
       actions: [],
       children: [],
     };
@@ -182,6 +194,10 @@ describe('detectLoadingIndicators', () => {
       scrollable: false,
       longClickable: false,
       password: false,
+      hintText: '',
+      stateDescription: '',
+      paneTitle: '',
+      tooltipText: '',
       actions: [],
       children: [],
     };

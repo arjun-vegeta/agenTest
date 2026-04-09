@@ -101,6 +101,18 @@ export interface UnifiedUINode {
   longClickable: boolean;
   password: boolean;
 
+  /**
+   * Compose-specific a11y fields (Phase 3.8). Populated by the on-device
+   * helper when the running app uses Jetpack Compose and sets semantics
+   * modifiers like stateDescription or paneTitle. Empty string when absent
+   * (never undefined) so equality checks stay stable across the XML path
+   * and the helper JSON path.
+   */
+  hintText: string;
+  stateDescription: string;
+  paneTitle: string;
+  tooltipText: string;
+
   /** Available interaction actions */
   actions: UnifiedAction[];
   /** Child nodes */
@@ -388,6 +400,26 @@ export interface LlmTreeNode {
   desc?: string;
   /** Short class name (e.g. "ReactViewGroup") — included for unlabeled elements */
   cls?: string;
+  /**
+   * Hint text — populated from `AccessibilityNodeInfo.hintText` (API 26+).
+   * Compose apps use this for things like TextField placeholder hints.
+   */
+  hint?: string;
+  /**
+   * State description — populated from `AccessibilityNodeInfo.stateDescription`
+   * (API 28+). Compose apps use this for Switch/Checkbox state text like
+   * "on" or "unchecked".
+   */
+  state?: string;
+  /**
+   * Pane title — populated from `AccessibilityNodeInfo.paneTitle` (API 28+).
+   * Compose Scaffold / navigation panes emit this.
+   */
+  pane?: string;
+  /**
+   * Tooltip text — populated from `AccessibilityNodeInfo.tooltipText` (API 28+).
+   */
+  tooltip?: string;
   bounds: string;
   /** Only included when element is tappable but has no id/text/desc */
   clickable?: true;

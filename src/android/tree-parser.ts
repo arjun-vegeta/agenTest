@@ -186,6 +186,14 @@ function convertNode(raw: RawXmlNode, pathPrefix: string): UnifiedUINode {
     longClickable: parseBool(raw['long-clickable']),
     password: parseBool(raw.password),
 
+    // Compose a11y extras — `uiautomator dump` XML doesn't expose them so
+    // the XML path always defaults to empty. Helper JSON path populates
+    // them when the app is built with Compose.
+    hintText: '',
+    stateDescription: '',
+    paneTitle: '',
+    tooltipText: '',
+
     actions: deriveActions(raw),
     children: [],
   };
@@ -218,6 +226,17 @@ export interface HelperJsonNode {
   longClickable?: boolean;
   scrollable?: boolean;
   password?: boolean;
+  /**
+   * Compose-specific accessibility fields (Phase 3.8). These are populated
+   * on API 26+/28+ when the running app is built with Jetpack Compose and
+   * uses `Modifier.semantics { stateDescription = ... }` etc. Native Views
+   * rarely set them so they're a strong Compose signal as well as useful
+   * content for the LLM.
+   */
+  hintText?: string;
+  stateDescription?: string;
+  paneTitle?: string;
+  tooltipText?: string;
   children?: HelperJsonNode[];
 }
 
@@ -277,6 +296,10 @@ function convertHelperNode(raw: HelperJsonNode, pathPrefix: string, index: numbe
     scrollable,
     longClickable,
     password: raw.password ?? false,
+    hintText: raw.hintText ?? '',
+    stateDescription: raw.stateDescription ?? '',
+    paneTitle: raw.paneTitle ?? '',
+    tooltipText: raw.tooltipText ?? '',
     actions,
     children: [],
   };
@@ -337,6 +360,10 @@ export function parseUiAutomatorXml(xml: string): UnifiedUINode {
     scrollable: false,
     longClickable: false,
     password: false,
+    hintText: '',
+    stateDescription: '',
+    paneTitle: '',
+    tooltipText: '',
     actions: [],
     children: rootNodes.map((child, i) => convertNode(child, String(i))),
   };
@@ -375,6 +402,9 @@ function shouldPruneNode(node: UnifiedUINode): boolean {
 function isEmptyWrapper(node: UnifiedUINode): boolean {
   if (node.children.length !== 1) return false;
   if (node.resourceId || node.text || node.description) return false;
+  // Compose semantic modifiers count as labels — never collapse nodes that
+  // have stateDescription/paneTitle/hintText/tooltipText populated.
+  if (node.hintText || node.stateDescription || node.paneTitle || node.tooltipText) return false;
   if (node.clickable || node.scrollable || node.checkable) return false;
   if (node.role !== UNIFIED_ROLES.CONTAINER && node.role !== UNIFIED_ROLES.UNKNOWN) return false;
   return true;
@@ -403,8 +433,23 @@ function serializeNode(node: UnifiedUINode): LlmTreeNode {
   if (node.text) result.text = node.text;
   if (node.description) result.desc = node.description;
 
+  // Compose-specific a11y fields (Phase 3.8). When present, these are huge
+  // signals for LLMs: a Switch without text/desc is ambiguous, but a Switch
+  // with `state: "on"` is unambiguous. Emit whenever populated.
+  if (node.hintText) result.hint = node.hintText;
+  if (node.stateDescription) result.state = node.stateDescription;
+  if (node.paneTitle) result.pane = node.paneTitle;
+  if (node.tooltipText) result.tooltip = node.tooltipText;
+
   // For unlabeled elements, include short class name so the AI can identify them
-  const hasLabel = node.resourceId || node.text || node.description;
+  const hasLabel =
+    node.resourceId ||
+    node.text ||
+    node.description ||
+    node.hintText ||
+    node.stateDescription ||
+    node.paneTitle ||
+    node.tooltipText;
   if (!hasLabel) {
     const shortClass = node.className.split('.').pop() ?? node.className;
     if (shortClass && shortClass !== 'View' && shortClass !== 'ViewGroup') {
