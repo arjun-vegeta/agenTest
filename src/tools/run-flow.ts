@@ -1,5 +1,6 @@
 import { IDLE_LOADING, LIGHTWEIGHT_ACTIONS, SYSTEM_PACKAGES } from '../constants.js';
 import { DeviceClient } from '../android/device-client.js';
+import type { FrameworkSync } from '../android/framework-sync.js';
 import type { GrpcEmulatorClient } from '../android/grpc-client.js';
 import type { HelperClient } from '../android/helper-client.js';
 import { snapshotTree, waitForIdle } from '../android/idle.js';
@@ -74,8 +75,9 @@ export async function handleRunFlow(
   deviceId?: string,
   grpcClient?: GrpcEmulatorClient,
   helperClient?: HelperClient,
+  frameworkSync?: FrameworkSync,
 ): Promise<FlowTrace> {
-  const device = new DeviceClient(shell, deviceId, grpcClient, false, helperClient);
+  const device = new DeviceClient(shell, deviceId, grpcClient, false, helperClient, frameworkSync);
   const results: StepResult[] = [];
   const detectedDialogs: SystemDialog[] = [];
 
