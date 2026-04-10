@@ -125,6 +125,12 @@ export interface UnifiedUINode {
 
 export const ElementSelectorSchema = z
   .object({
+    ref: z
+      .string()
+      .optional()
+      .describe(
+        'Short ref token from the last tree snapshot (e.g. "@b1"). When set, ref takes priority over all other fields — they are ignored. If the ref is stale (screen changed), you\'ll get a clear error telling you to call lazytest_get_ui_tree for fresh refs.',
+      ),
     id: z
       .string()
       .optional()
@@ -141,7 +147,7 @@ export const ElementSelectorSchema = z
       .describe('Pick the Nth match (0-based) when multiple elements match'),
   })
   .describe(
-    'Element targeting — at least one of id, text, textContains, className, or description required',
+    'Element targeting — use ref from the last tree snapshot (fastest), OR at least one of id, text, textContains, className, description',
   );
 
 export type ElementSelector = z.infer<typeof ElementSelectorSchema>;
@@ -356,8 +362,28 @@ export interface FlowTrace {
   stepsCompleted: number;
   totalSteps: number;
   results: StepResult[];
-  /** UI tree snapshot at the end (or at point of failure) */
-  finalUiTree: LlmTreeNode;
+  /**
+   * 6-char screen fingerprint. Always present. Compare with the fingerprint
+   * from the `lazytest_connect` / `lazytest_get_ui_tree` call to know if the
+   * screen changed during the flow.
+   */
+  screenFingerprint: string;
+  /**
+   * True when the screen is meaningfully different from the initial snapshot
+   * at the start of the flow. When false AND success is true, the UI is
+   * exactly where you left it — reuse your prior refs without re-snaphotting.
+   *
+   * Typing into an EditText field does NOT flip this flag — that's an
+   * in-place mutation, not a screen change.
+   */
+  screenChanged: boolean;
+  /**
+   * Compact text snapshot at the end (or at point of failure). Only included
+   * when `screenChanged` is true OR `success` is false — when the screen
+   * didn't change and everything passed, there's nothing new to report and
+   * the tree is omitted to save tokens.
+   */
+  finalUiTree?: string;
   error?: string;
   /** System dialogs detected during the flow (permission prompts, crash dialogs) */
   systemDialogs?: SystemDialog[];
