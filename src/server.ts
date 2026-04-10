@@ -4,6 +4,7 @@ import { z } from 'zod';
 import type { FrameworkSync } from './android/framework-sync.js';
 import type { GrpcEmulatorClient } from './android/grpc-client.js';
 import type { HelperHandle } from './android/helper-installer.js';
+import { RefRegistry } from './android/ref-registry.js';
 import { LOGCAT, SERVER_NAME, SERVER_VERSION, TOOL_NAMES, TOOL_NAMES_EXT } from './constants.js';
 import { LazyTestError } from './errors.js';
 import { ProcessShellExecutor } from './shell.js';
@@ -40,6 +41,9 @@ let activeHelper: HelperHandle | undefined;
 /** Tracks the active framework sync backend (Hermes CDP / Dart VM Service) */
 let activeSync: FrameworkSync | undefined;
 
+/** Ref registry — maps @ref tokens to nodes across tool calls within a session */
+const activeRefRegistry = new RefRegistry();
+
 // ---------------------------------------------------------------------------
 // MCP Server
 // ---------------------------------------------------------------------------
@@ -55,7 +59,21 @@ const server = new McpServer({
 
 server.tool(
   TOOL_NAMES.CONNECT,
-  'Connect to an Android emulator/device and launch the app. Returns the initial UI accessibility tree. Pass verbose:true to include a step-by-step framework-sync trace in the response — useful for debugging why Hermes CDP / Dart VM Service / the idling bridge failed to attach.',
+  `Connect to an Android emulator/device and launch the app. Returns the initial UI screen in compact text format with @ref tokens you can use as selectors.
+
+The compact format uses one line per element:
+  @b1 btn "Sign in"      — button, ref @b1
+  @f1 input "Email"      — text field, ref @f1
+  @c1 check "Remember me" — checkbox
+  @s1 scroll              — scrollable area
+  @l1 link "Forgot?"     — clickable text link
+  @g1 tap                 — generic clickable (unlabeled)
+  "plain text"            — non-interactive text
+
+Use refs in subsequent run_flow steps: { "action": "tap", "target": { "ref": "@b1" } }
+Traditional selectors (id/text/className/description) still work alongside refs.
+
+Pass verbose:true to include framework-sync diagnostics.`,
   {
     packageName: z.string().describe('Android package name (e.g. "com.example.myapp")'),
     deviceId: z
@@ -68,14 +86,9 @@ server.tool(
       .enum(['auto', 'adb', 'grpc'])
       .optional()
       .describe(
-        'Input backend: "auto" (default) tries gRPC then falls back to ADB; "adb" forces ADB only; "grpc" requires gRPC (emulator only, fails if unavailable).',
+        'Input backend: "auto" (default) tries gRPC then falls back to ADB; "adb" forces ADB only; "grpc" requires gRPC (emulator only).',
       ),
-    verbose: z
-      .boolean()
-      .optional()
-      .describe(
-        'Include a step-by-step `diagnostics` array in the response showing each framework-detection + sync-attach step. Off by default to save tokens — `framework` and `frameworkSync` alone tell you what succeeded. Turn on when something unexpected happens and you need to see which step failed.',
-      ),
+    verbose: z.boolean().optional().describe('Include framework-sync diagnostics in the response.'),
   },
   async ({ packageName, deviceId, backend, verbose }) => {
     try {
@@ -87,6 +100,7 @@ server.tool(
         activeGrpcClient,
         activeHelper,
         activeSync,
+        activeRefRegistry,
       );
       activeDeviceId = result.deviceId;
       activePackageName = packageName;
@@ -94,11 +108,6 @@ server.tool(
       activeHelper = result.helper;
       activeSync = result.sync;
 
-      // Diagnostics policy: saved ~2-4k tokens per flow during debugging
-      // but on the happy path they restate what `framework` and
-      // `frameworkSync` already say. Surface them only when the caller
-      // explicitly asks (verbose:true) OR when something unexpected
-      // happened that the LLM would want to explain to the developer.
       const anomalyDetected =
         result.framework === undefined ||
         (result.warnings !== undefined && result.warnings.length > 0);
@@ -108,21 +117,21 @@ server.tool(
         content: [
           {
             type: 'text',
-            text: JSON.stringify(
-              {
-                deviceId: result.deviceId,
-                packageName: result.packageName,
-                backend: result.backend,
-                helperInstalled: result.helperInstalled,
-                framework: result.framework,
-                frameworkSync: result.frameworkSync,
-                warnings: result.warnings,
-                diagnostics: includeDiagnostics ? result.diagnostics : undefined,
-                uiTree: result.uiTree,
-              },
-              null,
-              2,
-            ),
+            text: JSON.stringify({
+              deviceId: result.deviceId,
+              packageName: result.packageName,
+              backend: result.backend,
+              helperInstalled: result.helperInstalled,
+              framework: result.framework,
+              frameworkSync: result.frameworkSync,
+              screenFingerprint: result.screenFingerprint,
+              warnings: result.warnings,
+              diagnostics: includeDiagnostics ? result.diagnostics : undefined,
+            }),
+          },
+          {
+            type: 'text',
+            text: result.uiTree,
           },
         ],
       };
@@ -138,19 +147,54 @@ server.tool(
 
 server.tool(
   TOOL_NAMES.GET_UI_TREE,
-  'Get a fresh snapshot of the current UI accessibility tree as compact JSON. Use this to see what is on screen.',
-  {},
-  async () => {
+  `Get a fresh snapshot of the current UI screen. Returns compact text with @ref tokens by default.
+
+Use refs in selectors: { "ref": "@b1" }. If a ref is stale (screen changed), you'll get a clear error — just call this tool again for fresh refs.
+
+Options:
+- format: "compact" (default) or "full" (legacy JSON tree with bounds + classNames — use for debugging or layout inspection)
+- depth: max tree depth (omit for unlimited)
+- onlyInteractive: true to drop plain text lines (hoisted labels still appear on interactives)`,
+  {
+    format: z
+      .enum(['compact', 'full'])
+      .optional()
+      .describe(
+        'Output format: "compact" (default, indented text with @refs) or "full" (JSON tree with bounds/classNames for debugging)',
+      ),
+    depth: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe('Max tree depth. Deeper subtrees are summarized as "+N interactive elements".'),
+    onlyInteractive: z
+      .boolean()
+      .optional()
+      .describe(
+        'Drop plain text lines — only show interactive elements with refs. Labels are still hoisted onto interactives.',
+      ),
+  },
+  async ({ format, depth, onlyInteractive }) => {
     try {
       const result = await handleGetUiTree(
         shell,
+        activeRefRegistry,
+        { format, depth, onlyInteractive },
         activeDeviceId,
         activeGrpcClient,
         activeHelper?.client,
+        activeSync,
       );
 
+      if (result.format === 'full') {
+        return {
+          content: [{ type: 'text', text: JSON.stringify(result.uiTree, null, 2) }],
+        };
+      }
+
       return {
-        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+        content: [{ type: 'text', text: result.uiTree as string }],
       };
     } catch (err) {
       return formatError(err);
@@ -164,25 +208,20 @@ server.tool(
 
 server.tool(
   TOOL_NAMES.RUN_FLOW,
-  `Execute a batch of UI actions and assertions. Stops on first failure. Returns the final UI tree after all steps complete (or at point of failure).
+  `Execute a batch of UI actions and assertions. Stops on first failure.
 
-DO NOT add "wait" or "wait_for_stable" steps. The server automatically waits after EVERY action for the UI to settle and all loading indicators to disappear. Adding wait steps wastes time. If you need to check the screen state, just call get_ui_tree instead.
+TARGET ELEMENTS using refs from the last tree snapshot:
+  { "action": "tap", "target": { "ref": "@b1" } }
+Or use traditional selectors (id/text/textContains/className/description/index) — both work.
 
-If a step causes the app to navigate (e.g., auto-submit), the server detects that the next step's target is gone and returns immediately with the new screen — you can then re-plan.
+DO NOT add "wait" or "wait_for_stable" steps — the server auto-waits after every action.
+
+RESPONSE: includes screenFingerprint and screenChanged. If screenChanged is false and success is true, the UI is exactly where you left it — reuse your prior refs without re-snaphotting. The tree is only included when the screen actually changed or the flow failed.
 
 ACTIONS: tap, tap_coordinates, type, clear_text, swipe, swipe_coordinates, long_press, long_press_coordinates, double_tap, double_tap_coordinates, press_key, scroll_to.
 ASSERTIONS: assert_visible, assert_not_visible, assert_text_equals, assert_text_contains.
 
-SELECTORS (all are flexible matching):
-- id: substring match against resource-id ("email" matches "com.app:id/email")
-- text: exact match against visible text
-- textContains: substring match against visible text
-- className: matches full name OR short name ("EditText" matches "android.widget.EditText")
-- description: substring match against content-desc ("ira" matches "ira, Last seen today at 6:24 PM")
-- index: pick the Nth match (0-based)
-
-The tree uses "cls" field for short class names (e.g. "ReactEditText") — you can use this directly in the className selector.
-Use *_coordinates variants (x,y from bounds) for unlabeled icons. Use clear_text before type to overwrite existing text.`,
+SELECTORS: ref (fastest — from last snapshot), id (substring), text (exact), textContains (substring), className (short or full name), description (substring), index (0-based Nth match).`,
   {
     steps: z
       .array(ActionStepSchema)
@@ -198,10 +237,11 @@ Use *_coordinates variants (x,y from bounds) for unlabeled icons. Use clear_text
         activeGrpcClient,
         activeHelper?.client,
         activeSync,
+        activeRefRegistry,
       );
 
       return {
-        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+        content: [{ type: 'text', text: JSON.stringify(result) }],
       };
     } catch (err) {
       return formatError(err);
@@ -215,7 +255,7 @@ Use *_coordinates variants (x,y from bounds) for unlabeled icons. Use clear_text
 
 server.tool(
   TOOL_NAMES.RESET_APP,
-  'Force-stop and relaunch the app. Returns the fresh UI tree after relaunch. Use between test cases for clean state.',
+  'Force-stop and relaunch the app. Returns fresh compact tree with @refs. Use between test cases for clean state.',
   {
     packageName: z
       .string()
@@ -246,10 +286,23 @@ server.tool(
         activeGrpcClient,
         activeHelper?.client,
         activeSync,
+        activeRefRegistry,
       );
 
       return {
-        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({
+              packageName: result.packageName,
+              screenFingerprint: result.screenFingerprint,
+            }),
+          },
+          {
+            type: 'text',
+            text: result.uiTree,
+          },
+        ],
       };
     } catch (err) {
       return formatError(err);
