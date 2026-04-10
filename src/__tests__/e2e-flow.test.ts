@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { RefRegistry } from '../android/ref-registry.js';
 import { handleConnect } from '../tools/connect.js';
 import { handleGetUiTree } from '../tools/get-ui-tree.js';
 import { handleResetApp } from '../tools/reset-app.js';
@@ -72,26 +73,52 @@ function createAppSimulator() {
 describe('E2E: Full login flow', () => {
   it('connects and returns the initial UI tree', async () => {
     const { shell } = createAppSimulator();
+    const registry = new RefRegistry();
 
-    const result = await handleConnect(shell, 'com.example.myapp');
+    const result = await handleConnect(
+      shell,
+      'com.example.myapp',
+      undefined,
+      'auto',
+      undefined,
+      undefined,
+      undefined,
+      registry,
+    );
 
     expect(result.deviceId).toBe('emulator-5554');
     expect(result.packageName).toBe('com.example.myapp');
-    expect(result.uiTree).toBeDefined();
-    expect(result.uiTree.role).toBe('container');
+    expect(typeof result.uiTree).toBe('string');
+    expect(result.uiTree).toMatch(/^screen \d+x\d+/);
+    expect(result.screenFingerprint).toMatch(/^[0-9a-z]{6}$/);
   });
 
-  it('gets a fresh UI tree snapshot', async () => {
+  it('gets a fresh UI tree snapshot in compact format', async () => {
     const { shell } = createAppSimulator();
+    const registry = new RefRegistry();
 
-    const result = await handleGetUiTree(shell);
+    const result = await handleGetUiTree(shell, registry);
 
-    expect(result.uiTree).toBeDefined();
-    expect(result.uiTree.role).toBe('container');
+    expect(result.format).toBe('compact');
+    expect(typeof result.uiTree).toBe('string');
+    expect(result.uiTree).toMatch(/^screen /);
+    expect(result.fingerprint).toMatch(/^[0-9a-z]{6}$/);
+  });
+
+  it('gets a full JSON tree snapshot when format=full requested', async () => {
+    const { shell } = createAppSimulator();
+    const registry = new RefRegistry();
+
+    const result = await handleGetUiTree(shell, registry, { format: 'full' });
+
+    expect(result.format).toBe('full');
+    expect(typeof result.uiTree).toBe('object');
+    expect((result.uiTree as { role: string }).role).toBe('container');
   });
 
   it('runs a successful login flow', { timeout: 30_000 }, async () => {
     const { shell } = createAppSimulator();
+    const registry = new RefRegistry();
 
     const steps: ActionStep[] = [
       { action: 'tap', target: { id: 'email' } },
@@ -108,7 +135,15 @@ describe('E2E: Full login flow', () => {
       },
     ];
 
-    const trace = await handleRunFlow(shell, steps);
+    const trace = await handleRunFlow(
+      shell,
+      steps,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      registry,
+    );
 
     expect(trace.success).toBe(true);
     expect(trace.stepsCompleted).toBe(steps.length);
@@ -121,8 +156,35 @@ describe('E2E: Full login flow', () => {
       expect(result.error).toBeUndefined();
     }
 
-    // Final tree should be the home screen
-    expect(trace.finalUiTree).toBeDefined();
+    // Login flow navigates from login → home, so the screen changed
+    expect(trace.screenChanged).toBe(true);
+    expect(trace.screenFingerprint).toMatch(/^[0-9a-z]{6}$/);
+    // Final tree should be the home screen — string in compact format
+    expect(typeof trace.finalUiTree).toBe('string');
+  });
+
+  it('omits finalUiTree when screen did not change', async () => {
+    const { shell } = createAppSimulator();
+    const registry = new RefRegistry();
+
+    // type into a field — should not change the screen fingerprint
+    const trace = await handleRunFlow(
+      shell,
+      [
+        { action: 'type', target: { id: 'email' }, value: 'hello' },
+        { action: 'press_key', keycode: 'KEYCODE_TAB' },
+      ],
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      registry,
+    );
+
+    expect(trace.success).toBe(true);
+    expect(trace.screenChanged).toBe(false);
+    // No tree returned because nothing changed — this is the token win
+    expect(trace.finalUiTree).toBeUndefined();
   });
 
   it('stops on first assertion failure', async () => {
@@ -278,17 +340,36 @@ describe('E2E: Full login flow', () => {
 
   it('resets the app and returns fresh tree', async () => {
     const { shell, getCurrentScreen } = createAppSimulator();
+    const registry = new RefRegistry();
 
     // First navigate to home by tapping sign_in_button
-    await handleRunFlow(shell, [{ action: 'tap', target: { id: 'sign_in_button' } }]);
+    await handleRunFlow(
+      shell,
+      [{ action: 'tap', target: { id: 'sign_in_button' } }],
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      registry,
+    );
     expect(getCurrentScreen()).toBe('home');
 
     // Reset should go back to login
-    const result = await handleResetApp(shell, 'com.example.myapp');
+    const result = await handleResetApp(
+      shell,
+      'com.example.myapp',
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      registry,
+    );
 
     expect(getCurrentScreen()).toBe('login');
     expect(result.packageName).toBe('com.example.myapp');
-    expect(result.uiTree).toBeDefined();
+    expect(typeof result.uiTree).toBe('string');
+    expect(result.uiTree).toMatch(/^screen /);
+    expect(result.screenFingerprint).toMatch(/^[0-9a-z]{6}$/);
   });
 });
 
