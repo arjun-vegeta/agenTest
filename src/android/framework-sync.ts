@@ -25,6 +25,7 @@
  */
 
 import { FLUTTER_VM, IDLING_BRIDGE } from '../constants.js';
+import type { UnifiedUINode } from '../types.js';
 import type { AdbClient } from './adb.js';
 import {
   connectDartVmServiceFor,
@@ -32,11 +33,14 @@ import {
   waitForFlutterFrameIdle,
   type DartVmServiceClient,
 } from './dart-vm-service.js';
+import { extractFibersWithBounds, type FiberNode } from './fiber-extractor.js';
+import { fiberLabelsToPlainMap, mergeFiberLabels, type FiberMergerStats } from './fiber-merger.js';
 import {
   connectHermesForPackage,
   waitForHermesJsIdle,
   type HermesCdpClient,
 } from './hermes-cdp.js';
+import { computeScreenFingerprint } from './tree-parser.js';
 
 export type FrameworkKind = 'flutter' | 'react_native' | 'compose' | 'native';
 
@@ -97,6 +101,30 @@ export class FrameworkSync {
    * the developer the exact reason an attach failed.
    */
   private readonly diagnosticLog: string[] = [];
+
+  /**
+   * Cache of fiber-inferred labels keyed by screen fingerprint. The
+   * fiber walker is expensive enough (150-300ms including measurement
+   * callback waits) that we don't want to run it per step — the screen
+   * fingerprint is a cheap invalidation key. Typing into an EditText
+   * does NOT flip the fingerprint (by design), so all intra-screen
+   * lightweight actions reuse the cached labels.
+   *
+   * Set to an empty map with the current fingerprint after a failed
+   * extract so we don't retry every call. Cleared on framework detach.
+   */
+  private fiberLabelCache: { fingerprint: string; labels: Map<string, string> } | undefined;
+
+  /**
+   * Lazily-computed scaling factor for DIPs → physical pixels. Used by
+   * the fiber merger's Stage B bounds correlation. Android's `wm density`
+   * reports density in DPI (e.g., 420 for Pixel 6); the factor is
+   * density/160 (the baseline MDPI density).
+   *
+   * Cached for the session because `wm density` is a shell command and
+   * density doesn't change mid-session.
+   */
+  private densityFactor: number | undefined;
 
   constructor(init: FrameworkSyncInit) {
     this.framework = init.framework;
@@ -320,6 +348,111 @@ export class FrameworkSync {
       await sleep(50);
     }
     return false;
+  }
+
+  /**
+   * Phase 3.6 — extract labels for unlabeled interactive elements by
+   * walking the React Fiber tree (or, in future, the Flutter widget
+   * tree) and correlating them with the a11y tree.
+   *
+   * Returns a `Map<nodeId, label>` suitable for passing as
+   * `externalLabels` into `serializeTreeCompact`. Returns an empty map
+   * on every failure — silent degradation preserves existing behavior.
+   *
+   * The result is cached by screen fingerprint. On the same screen the
+   * cache hits and we skip the expensive walker call. This means typing
+   * into a field (which deliberately does NOT flip the fingerprint)
+   * reuses the cached labels. A real screen change invalidates the
+   * cache and we re-walk.
+   */
+  async snapshotFiberLabels(tree: UnifiedUINode): Promise<Map<string, string>> {
+    if (process.env['LAZYTEST_DISABLE_FIBER_INFERENCE'] === '1') {
+      this.logDiagnostic('fiber', 'skipped (LAZYTEST_DISABLE_FIBER_INFERENCE=1)');
+      return new Map();
+    }
+    if (!this.hermes) {
+      this.logDiagnostic('fiber', 'skipped (no hermes backend attached)');
+      return new Map();
+    }
+
+    const fingerprint = computeScreenFingerprint(tree);
+    if (this.fiberLabelCache && this.fiberLabelCache.fingerprint === fingerprint) {
+      this.logDiagnostic(
+        'fiber',
+        `cache hit fingerprint=${fingerprint} labels=${this.fiberLabelCache.labels.size}`,
+      );
+      return this.fiberLabelCache.labels;
+    }
+
+    let fibers: FiberNode[] | null;
+    try {
+      fibers = await extractFibersWithBounds(this.hermes);
+    } catch (err) {
+      this.logDiagnostic('fiber', `extract threw: ${errorMessage(err)}`);
+      // Cache an empty result so we don't spam the walker on every call
+      // when the hook is genuinely broken. The cache is fingerprint-scoped
+      // so the next real screen change still retries.
+      this.fiberLabelCache = { fingerprint, labels: new Map() };
+      return new Map();
+    }
+
+    if (!fibers) {
+      this.logDiagnostic('fiber', 'extract returned null (walker failed or no hook)');
+      this.fiberLabelCache = { fingerprint, labels: new Map() };
+      return new Map();
+    }
+
+    if (fibers.length === 0) {
+      this.logDiagnostic('fiber', 'extract returned 0 fibers');
+      this.fiberLabelCache = { fingerprint, labels: new Map() };
+      return new Map();
+    }
+
+    const densityFactor = await this.getOrComputeDensityFactor();
+    const stats: FiberMergerStats = {
+      totalFibers: 0,
+      dedupedFibers: 0,
+      fibersWithBounds: 0,
+      unlabeledA11yNodes: 0,
+      stageAMatches: 0,
+      stageBMatches: 0,
+      stageBNoMatch: 0,
+    };
+    const labelMap = fiberLabelsToPlainMap(mergeFiberLabels(tree, fibers, densityFactor, stats));
+    this.fiberLabelCache = { fingerprint, labels: labelMap };
+    this.logDiagnostic(
+      'fiber',
+      `snapshot fingerprint=${fingerprint} density=${densityFactor} ` +
+        `offsetY=${stats.calibrationOffsetY ?? 'none'} ` +
+        `fibers=${stats.totalFibers}→${stats.dedupedFibers} (${stats.fibersWithBounds} w/bounds) ` +
+        `unlabeled-a11y=${stats.unlabeledA11yNodes} ` +
+        `stageA=${stats.stageAMatches} stageB=${stats.stageBMatches} (no-match=${stats.stageBNoMatch}) ` +
+        `→ ${labelMap.size} labels`,
+    );
+
+    return labelMap;
+  }
+
+  /**
+   * Query `wm density` once and cache the DIP → physical pixel scaling
+   * factor. Density doesn't change mid-session so this is safe to cache
+   * for the life of the FrameworkSync instance. Returns 0 on any failure,
+   * which disables Stage B bounds correlation in the merger — Stage A
+   * (testID / accessibilityLabel) still runs.
+   */
+  private async getOrComputeDensityFactor(): Promise<number> {
+    if (this.densityFactor !== undefined) return this.densityFactor;
+    try {
+      const info = await this.adb.getDeviceInfo();
+      if (info.density > 0) {
+        this.densityFactor = info.density / 160;
+      } else {
+        this.densityFactor = 0;
+      }
+    } catch {
+      this.densityFactor = 0;
+    }
+    return this.densityFactor;
   }
 
   /**
