@@ -1,12 +1,12 @@
 import { AdbClient } from '../android/adb.js';
 import { waitForIdle } from '../android/idle.js';
-import { serializeTreeForLlm } from '../android/tree-parser.js';
 import { DeviceClient, type ActiveBackend } from '../android/device-client.js';
 import { FrameworkSync, type FrameworkKind } from '../android/framework-sync.js';
 import { GrpcEmulatorClient } from '../android/grpc-client.js';
 import { discoverEmulatorToken } from '../android/grpc-discovery.js';
 import { discoverHermesTargets } from '../android/hermes-cdp.js';
 import { ensureHelper, type HelperHandle } from '../android/helper-installer.js';
+import type { RefRegistry } from '../android/ref-registry.js';
 import { GRPC } from '../constants.js';
 import { GrpcConnectionError } from '../errors.js';
 import type { ShellExecutor } from '../types.js';
@@ -16,7 +16,10 @@ export type BackendOption = 'auto' | 'adb' | 'grpc';
 export interface ConnectResult {
   deviceId: string;
   packageName: string;
-  uiTree: ReturnType<typeof serializeTreeForLlm>;
+  /** Compact text tree from the initial screen snapshot. */
+  uiTree: string;
+  /** 6-char screen fingerprint. */
+  screenFingerprint: string;
   /** Which backend is active for input injection. */
   backend: ActiveBackend;
   /** Whether the on-device helper APK is installed and serving. */
@@ -82,6 +85,7 @@ export async function handleConnect(
   existingGrpcClient?: GrpcEmulatorClient,
   existingHelper?: HelperHandle,
   existingSync?: FrameworkSync,
+  registry?: RefRegistry,
 ): Promise<ConnectResult> {
   // Tear down any clients from a previous session
   if (existingGrpcClient) {
@@ -320,10 +324,30 @@ export async function handleConnect(
     }
   }
 
+  // Fetch fiber labels if Hermes is attached (Phase 3.6). Silent no-op
+  // for non-RN apps or when Hermes is unavailable. The call appends
+  // further diagnostic lines to `frameworkSync.diagnostics`, so we
+  // re-snapshot them below before returning.
+  const diagnosticsBeforeFiber = frameworkSync ? frameworkSync.diagnostics.length : 0;
+  const fiberLabels = frameworkSync
+    ? await frameworkSync.snapshotFiberLabels(idleResult.tree)
+    : new Map<string, string>();
+  if (frameworkSync) {
+    // Pull any new [fiber] diagnostic lines added by the snapshot into
+    // the outgoing response.
+    const newLines = frameworkSync.diagnostics.slice(diagnosticsBeforeFiber);
+    diagnostics.push(...newLines);
+  }
+
+  // Build registry from initial tree — produces compact text + fingerprint + refs
+  registry?.clear();
+  const compactResult = registry?.rebuild(idleResult.tree, { externalLabels: fiberLabels });
+
   return {
     deviceId: resolvedDeviceId,
     packageName,
-    uiTree: serializeTreeForLlm(idleResult.tree),
+    uiTree: compactResult?.text ?? '',
+    screenFingerprint: compactResult?.fingerprint ?? '',
     backend: deviceFull.backend,
     helperInstalled: helper !== null,
     framework,

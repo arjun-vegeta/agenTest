@@ -5,7 +5,7 @@ import type { GrpcEmulatorClient } from '../android/grpc-client.js';
 import type { HelperClient } from '../android/helper-client.js';
 import { snapshotTree, waitForIdle } from '../android/idle.js';
 import { checkAssertion, executeAction, resolveTarget } from '../android/input.js';
-import { serializeTreeForLlm } from '../android/tree-parser.js';
+import type { RefRegistry } from '../android/ref-registry.js';
 import type {
   ActionStep,
   Bounds,
@@ -49,12 +49,23 @@ function getStepTarget(step: ActionStep): ElementSelector | undefined {
  * Pre-validate: check if the next step's target exists in the current tree.
  * Returns true if the target is found or the step has no target.
  * Returns false if the step has a target that doesn't exist — screen likely changed.
+ *
+ * Skips the check for assertion steps entirely: assert_not_visible's whole
+ * purpose is to pass when the target is absent, assert_visible reports
+ * its own "not found" result, and assert_text_* handle missing targets
+ * gracefully too. Pre-validation is only useful for tap/type/swipe
+ * actions where a missing target means the LLM has a stale plan.
  */
-function canExecuteNextStep(tree: UnifiedUINode, step: ActionStep): boolean {
+function canExecuteNextStep(
+  tree: UnifiedUINode,
+  step: ActionStep,
+  registry?: RefRegistry,
+): boolean {
+  if (isAssertionStep(step)) return true;
   const target = getStepTarget(step);
   if (!target) return true;
   try {
-    resolveTarget(tree, target);
+    resolveTarget(tree, target, registry);
     return true;
   } catch {
     return false;
@@ -76,10 +87,26 @@ export async function handleRunFlow(
   grpcClient?: GrpcEmulatorClient,
   helperClient?: HelperClient,
   frameworkSync?: FrameworkSync,
+  registry?: RefRegistry,
 ): Promise<FlowTrace> {
   const device = new DeviceClient(shell, deviceId, grpcClient, false, helperClient, frameworkSync);
   const results: StepResult[] = [];
   const detectedDialogs: SystemDialog[] = [];
+
+  // Fetch fiber labels for the current tree (Phase 3.6). Cached by
+  // fingerprint inside FrameworkSync, so repeated calls on the same
+  // screen are cheap. Silent no-op when no Hermes backend.
+  const fetchLabels = async (tree: UnifiedUINode): Promise<Map<string, string>> => {
+    if (!frameworkSync) return new Map();
+    return frameworkSync.snapshotFiberLabels(tree);
+  };
+
+  // Rebuild helper: fetches fiber labels + rebuilds the registry. Used
+  // after every tree snapshot to keep refs in sync.
+  const rebuildRegistry = async (tree: UnifiedUINode) => {
+    const externalLabels = await fetchLabels(tree);
+    return registry?.rebuild(tree, { externalLabels });
+  };
 
   // Get initial tree to determine screen bounds and provide context for actions
   let currentTree = await snapshotTree(device);
@@ -88,6 +115,10 @@ export async function handleRunFlow(
 
   // Capture the target package for crash detection
   const targetPackage = currentTree.packageName;
+
+  // Build initial registry snapshot — captures fingerprint + refs + fiber labels
+  const initialResult = await rebuildRegistry(currentTree);
+  const initialFingerprint = initialResult?.fingerprint ?? '';
 
   // Check for system dialogs on the initial screen
   const initialDialogs = await device.detectSystemDialogs(currentTree);
@@ -102,7 +133,8 @@ export async function handleRunFlow(
       if (isAssertionStep(step)) {
         // For assertions, re-read the tree to get fresh state
         currentTree = await snapshotTree(device);
-        const assertionResult = checkAssertion(currentTree, step);
+        await rebuildRegistry(currentTree);
+        const assertionResult = checkAssertion(currentTree, step, registry);
 
         results.push({
           stepIndex: i,
@@ -114,20 +146,25 @@ export async function handleRunFlow(
 
         // Stop on first assertion failure
         if (!assertionResult.passed) {
+          const finalResult = await rebuildRegistry(currentTree);
+          const finalFingerprint = finalResult?.fingerprint ?? '';
           return {
             success: false,
             stepsCompleted: i,
             totalSteps: steps.length,
             results,
-            finalUiTree: serializeTreeForLlm(currentTree),
+            screenFingerprint: finalFingerprint,
+            screenChanged: finalFingerprint !== initialFingerprint,
+            finalUiTree: finalResult?.text,
             error: assertionResult.message,
             systemDialogs: detectedDialogs.length > 0 ? detectedDialogs : undefined,
           };
         }
       } else if (step.action === 'wait') {
         // Wait steps sleep then re-snapshot the tree so finalUiTree reflects post-wait state
-        await executeAction(device, currentTree, step, screenBounds);
+        await executeAction(device, currentTree, step, screenBounds, registry);
         currentTree = await snapshotTree(device);
+        await rebuildRegistry(currentTree);
 
         results.push({
           stepIndex: i,
@@ -144,6 +181,7 @@ export async function handleRunFlow(
           maxLoadingWaitMs: timeout,
         });
         currentTree = idleResult.tree;
+        await rebuildRegistry(currentTree);
 
         results.push({
           stepIndex: i,
@@ -154,8 +192,9 @@ export async function handleRunFlow(
         });
       } else if (isScrollToStep(step)) {
         // scroll_to handles its own idle/snapshot loop internally
-        await executeAction(device, currentTree, step, screenBounds);
+        await executeAction(device, currentTree, step, screenBounds, registry);
         currentTree = await snapshotTree(device);
+        await rebuildRegistry(currentTree);
 
         results.push({
           stepIndex: i,
@@ -165,8 +204,9 @@ export async function handleRunFlow(
         });
       } else if (LIGHTWEIGHT_ACTIONS.includes(step.action)) {
         // Lightweight action — single snapshot, no idle polling (faster)
-        await executeAction(device, currentTree, step, screenBounds);
+        await executeAction(device, currentTree, step, screenBounds, registry);
         currentTree = await snapshotTree(device);
+        await rebuildRegistry(currentTree);
 
         results.push({
           stepIndex: i,
@@ -176,12 +216,15 @@ export async function handleRunFlow(
         });
       } else {
         // Heavy action (tap, swipe, etc.) — full idle detection with loading awareness
-        await executeAction(device, currentTree, step, screenBounds);
+        await executeAction(device, currentTree, step, screenBounds, registry);
         const idleResult = await waitForIdle(device);
         currentTree = idleResult.tree;
+        await rebuildRegistry(currentTree);
 
         // Check for app crash (root package changed to system package)
         if (detectAppCrash(currentTree, targetPackage)) {
+          const finalResult = await rebuildRegistry(currentTree);
+          const finalFingerprint = finalResult?.fingerprint ?? '';
           results.push({
             stepIndex: i,
             action: step,
@@ -194,7 +237,9 @@ export async function handleRunFlow(
             stepsCompleted: i,
             totalSteps: steps.length,
             results,
-            finalUiTree: serializeTreeForLlm(currentTree),
+            screenFingerprint: finalFingerprint,
+            screenChanged: true,
+            finalUiTree: finalResult?.text,
             error: `App crashed after step ${i} (${step.action}). Current package: ${currentTree.packageName}`,
             systemDialogs: detectedDialogs.length > 0 ? detectedDialogs : undefined,
             appCrashDetected: true,
@@ -231,12 +276,16 @@ export async function handleRunFlow(
         // If we can't even snapshot, use whatever we had
       }
 
+      const finalResult = await rebuildRegistry(currentTree);
+      const finalFingerprint = finalResult?.fingerprint ?? '';
       return {
         success: false,
         stepsCompleted: i,
         totalSteps: steps.length,
         results,
-        finalUiTree: serializeTreeForLlm(currentTree),
+        screenFingerprint: finalFingerprint,
+        screenChanged: finalFingerprint !== initialFingerprint,
+        finalUiTree: finalResult?.text,
         error: `Step ${i} (${step.action}) failed: ${errorMessage}`,
         systemDialogs: detectedDialogs.length > 0 ? detectedDialogs : undefined,
       };
@@ -246,26 +295,38 @@ export async function handleRunFlow(
     // If the screen changed (e.g., app auto-navigated), fail fast instead of
     // wasting time on idle detection for a stale target.
     const nextStep = steps[i + 1];
-    if (nextStep && !canExecuteNextStep(currentTree, nextStep)) {
+    if (nextStep && !canExecuteNextStep(currentTree, nextStep, registry)) {
+      const finalResult = await rebuildRegistry(currentTree);
+      const finalFingerprint = finalResult?.fingerprint ?? '';
       return {
         success: false,
         stepsCompleted: i + 1,
         totalSteps: steps.length,
         results,
-        finalUiTree: serializeTreeForLlm(currentTree),
+        screenFingerprint: finalFingerprint,
+        screenChanged: finalFingerprint !== initialFingerprint,
+        finalUiTree: finalResult?.text,
         error: `Screen changed after step ${i} (${step.action}): target for step ${i + 1} (${nextStep.action}) no longer exists. The previous action may have triggered a navigation.`,
         systemDialogs: detectedDialogs.length > 0 ? detectedDialogs : undefined,
       };
     }
   }
 
-  // All steps passed
+  // All steps passed — compute final fingerprint
+  const finalResult = await rebuildRegistry(currentTree);
+  const finalFingerprint = finalResult?.fingerprint ?? '';
+  const screenChanged = finalFingerprint !== initialFingerprint;
+
   return {
     success: true,
     stepsCompleted: steps.length,
     totalSteps: steps.length,
     results,
-    finalUiTree: serializeTreeForLlm(currentTree),
+    screenFingerprint: finalFingerprint,
+    screenChanged,
+    // Only include the tree when the screen changed — if nothing changed and
+    // all steps passed, saving the tokens is the whole point of this work.
+    finalUiTree: screenChanged ? finalResult?.text : undefined,
     systemDialogs: detectedDialogs.length > 0 ? detectedDialogs : undefined,
   };
 }

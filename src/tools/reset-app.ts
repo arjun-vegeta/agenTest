@@ -3,12 +3,13 @@ import type { FrameworkSync } from '../android/framework-sync.js';
 import type { GrpcEmulatorClient } from '../android/grpc-client.js';
 import type { HelperClient } from '../android/helper-client.js';
 import { waitForIdle } from '../android/idle.js';
-import { serializeTreeForLlm } from '../android/tree-parser.js';
-import type { LlmTreeNode, ShellExecutor } from '../types.js';
+import type { RefRegistry } from '../android/ref-registry.js';
+import type { ShellExecutor } from '../types.js';
 
 export interface ResetAppResult {
   packageName: string;
-  uiTree: LlmTreeNode;
+  screenFingerprint: string;
+  uiTree: string;
 }
 
 export async function handleResetApp(
@@ -18,6 +19,7 @@ export async function handleResetApp(
   grpcClient?: GrpcEmulatorClient,
   helperClient?: HelperClient,
   frameworkSync?: FrameworkSync,
+  registry?: RefRegistry,
 ): Promise<ResetAppResult> {
   const device = new DeviceClient(shell, deviceId, grpcClient, false, helperClient, frameworkSync);
 
@@ -30,8 +32,17 @@ export async function handleResetApp(
   // Wait for UI to settle (with loading indicator detection)
   const idleResult = await waitForIdle(device);
 
+  // Fetch fiber labels if Hermes is attached (Phase 3.6).
+  const fiberLabels = frameworkSync
+    ? await frameworkSync.snapshotFiberLabels(idleResult.tree)
+    : new Map<string, string>();
+
+  // Rebuild registry with fresh tree
+  const compactResult = registry?.rebuild(idleResult.tree, { externalLabels: fiberLabels });
+
   return {
     packageName,
-    uiTree: serializeTreeForLlm(idleResult.tree),
+    screenFingerprint: compactResult?.fingerprint ?? '',
+    uiTree: compactResult?.text ?? '',
   };
 }
