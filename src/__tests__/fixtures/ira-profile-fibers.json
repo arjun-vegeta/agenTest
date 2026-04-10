@@ -1,0 +1,193 @@
+{
+  "ok": true,
+  "count": 25,
+  "_comment": "Synthesized from live fiber walker output against ai.rumik.ira.twa on 2026-04-10. Preserves the structure we observed: host fibers wrapped by Lucide icon components (ArrowLeft, Settings, Pencil, BrandX, etc.), with some already having accessibilityLabel props. Used as a test fixture for fiber-merger.",
+  "nodes": [
+    {
+      "tag": 21009,
+      "host": "RCTView",
+      "component": "Header",
+      "ancestors": ["Header", "ProfilePage", "SceneView", "NativeStackNavigator"],
+      "props": {}
+    },
+    {
+      "tag": 21011,
+      "host": "RCTView",
+      "component": "ArrowLeft",
+      "ancestors": ["ArrowLeft", "Pressable", "Header", "ProfilePage", "SceneView"],
+      "props": {}
+    },
+    {
+      "tag": 21013,
+      "host": "RNSVGSvgViewAndroid",
+      "component": "ArrowLeft",
+      "ancestors": ["Svg", "ArrowLeft", "Pressable", "Header", "ProfilePage"],
+      "props": {}
+    },
+    {
+      "tag": 21015,
+      "host": "RNSVGPath",
+      "component": "ArrowLeft",
+      "ancestors": ["Path", "Svg", "ArrowLeft", "Pressable", "Header", "ProfilePage"],
+      "props": {}
+    },
+    {
+      "tag": 21019,
+      "host": "RCTView",
+      "component": "Settings",
+      "ancestors": ["Settings", "Pressable", "Header", "ProfilePage", "SceneView"],
+      "props": {}
+    },
+    {
+      "tag": 21021,
+      "host": "RNSVGSvgViewAndroid",
+      "component": "Settings",
+      "ancestors": ["Svg", "Settings", "Pressable", "Header", "ProfilePage"],
+      "props": {}
+    },
+    {
+      "tag": 21023,
+      "host": "RNSVGPath",
+      "component": "Settings",
+      "ancestors": ["Path", "Svg", "Settings", "Pressable", "Header", "ProfilePage"],
+      "props": {}
+    },
+    {
+      "tag": 21007,
+      "host": "ExpoImage",
+      "component": "ExpoImage",
+      "ancestors": ["ExpoImage", "Pressable", "ProfilePage", "SceneView"],
+      "props": {
+        "source": "[{\"uri\":\"https://d3s62njta9pw6e.cloudfront.net/ira_with_computer_compressed.jpg\""
+      }
+    },
+    {
+      "tag": 21031,
+      "host": "RCTText",
+      "component": "ProfilePage",
+      "ancestors": ["Text", "ProfilePage", "SceneView", "NativeStackNavigator"],
+      "props": {}
+    },
+    {
+      "tag": 21033,
+      "host": "RCTText",
+      "component": "ProfilePage",
+      "ancestors": ["Text", "ProfilePage", "SceneView", "NativeStackNavigator"],
+      "props": {}
+    },
+    {
+      "tag": 21045,
+      "host": "RCTView",
+      "component": "Pencil",
+      "ancestors": ["Pencil", "Pressable", "ProfilePage", "SceneView"],
+      "props": {}
+    },
+    {
+      "tag": 21047,
+      "host": "RNSVGSvgViewAndroid",
+      "component": "Pencil",
+      "ancestors": ["Svg", "Pencil", "Pressable", "ProfilePage"],
+      "props": {}
+    },
+    {
+      "tag": 21049,
+      "host": "RCTView",
+      "component": "ProfileTab",
+      "ancestors": ["ProfileTab", "Pressable", "ProfilePage", "SceneView"],
+      "props": {
+        "accessibilityLabel": "visit our x page"
+      }
+    },
+    {
+      "tag": 21051,
+      "host": "RNSVGSvgViewAndroid",
+      "component": "BrandX",
+      "ancestors": ["Svg", "BrandX", "ProfileTab", "Pressable", "ProfilePage"],
+      "props": {}
+    },
+    {
+      "tag": 21053,
+      "host": "RCTText",
+      "component": "ProfileTab",
+      "ancestors": ["Text", "ProfileTab", "Pressable", "ProfilePage"],
+      "props": {}
+    },
+    {
+      "tag": 21059,
+      "host": "RCTView",
+      "component": "ProfileTab",
+      "ancestors": ["ProfileTab", "Pressable", "ProfilePage", "SceneView"],
+      "props": {
+        "accessibilityLabel": "visit our instagram page"
+      }
+    },
+    {
+      "tag": 21061,
+      "host": "RNSVGSvgViewAndroid",
+      "component": "BrandInstagram",
+      "ancestors": ["Svg", "BrandInstagram", "ProfileTab", "Pressable", "ProfilePage"],
+      "props": {}
+    },
+    {
+      "tag": 21069,
+      "host": "RCTView",
+      "component": "ProfileTab",
+      "ancestors": ["ProfileTab", "Pressable", "ProfilePage", "SceneView"],
+      "props": {
+        "accessibilityLabel": "visit our facebook page"
+      }
+    },
+    {
+      "tag": 21071,
+      "host": "RNSVGSvgViewAndroid",
+      "component": "BrandFacebook",
+      "ancestors": ["Svg", "BrandFacebook", "ProfileTab", "Pressable", "ProfilePage"],
+      "props": {}
+    },
+    {
+      "tag": 21083,
+      "host": "RNSScreenStackHeaderConfig",
+      "component": "ScreenStackHeaderConfig",
+      "ancestors": ["ScreenStackHeaderConfig", "SceneView", "NativeStackNavigator", "Dashboard"],
+      "props": {
+        "title": "Ira",
+        "color": "rgb(28, 28, 30)"
+      }
+    },
+    {
+      "tag": 21123,
+      "host": "RCTView",
+      "component": "ChatScreen",
+      "ancestors": ["ChatScreen", "SceneView", "NativeStackNavigator", "Dashboard"],
+      "props": {}
+    },
+    {
+      "tag": 21205,
+      "host": "RNSVGSvgViewAndroid",
+      "component": "Camera",
+      "ancestors": ["Svg", "Camera", "Pressable", "InputSection", "ChatScreen"],
+      "props": {}
+    },
+    {
+      "tag": 21249,
+      "host": "RNSVGSvgViewAndroid",
+      "component": "Photo",
+      "ancestors": ["Svg", "Photo", "Pressable", "InputSection", "ChatScreen"],
+      "props": {}
+    },
+    {
+      "tag": 21307,
+      "host": "RNSVGSvgViewAndroid",
+      "component": "HangoutIcon",
+      "ancestors": ["Svg", "HangoutIcon", "Pressable", "InputSection", "ChatScreen"],
+      "props": {}
+    },
+    {
+      "tag": 21167,
+      "host": "RNSVGSvgViewAndroid",
+      "component": "SendIcon",
+      "ancestors": ["Svg", "SendIcon", "InputSection", "ChatScreen"],
+      "props": {}
+    }
+  ]
+}

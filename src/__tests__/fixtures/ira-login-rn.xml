@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Real-world fixture from a Bolt/Lovable-style React Native app:
+  ai.rumik.ira.twa (the "Ira" chat app). Captured live from the emulator
+  via lazytest_get_ui_tree on 2026-04-10.
+
+  Critical properties for the target user:
+  - Empty resource-ids on every node (RN doesn't auto-populate testID)
+  - The "sign up" button is a clickable container wrapping a TextView
+    "sign up" — the classic TouchableOpacity > Text pattern that
+    hoisting + duplicate-suppression must handle correctly
+  - The outer clickable wrapper has an AGGREGATED a11y description that
+    concatenates all descendant text — the 80-char threshold in
+    ownLabelOf() drops this so transparent-collapse can fire
+  - The +91 country code is a nested clickable container wrapping its
+    own TextView, inside two unlabeled wrapper clickables — the wrapper
+    hell the transparent-collapse rule exists to prevent
+  - The phone EditText is clickable AND editable, inside the same
+    wrapper chain as the +91 tap
+
+  This fixture is the acceptance test for the Bolt/v0/Lovable target
+  user. Every real affordance must end up as an addressable, labeled
+  ref in the compact output without duplicate text lines and without
+  nested wrapper hell.
+-->
+<hierarchy rotation="0">
+  <node index="0" text="" resource-id="" class="android.widget.FrameLayout" package="ai.rumik.ira.twa" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[0,0][1280,2784]">
+    <node index="0" text="" resource-id="" class="com.facebook.react.views.view.ReactViewGroup" package="ai.rumik.ira.twa" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[0,0][1280,2784]">
+      <node index="0" text="" resource-id="" class="com.facebook.react.views.scroll.ReactScrollView" package="ai.rumik.ira.twa" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="true" long-clickable="false" password="false" selected="false" bounds="[0,0][1280,2784]">
+        <node index="0" text="" resource-id="" class="com.facebook.react.views.view.ReactViewGroup" package="ai.rumik.ira.twa" content-desc="meet ira, the friend who is always present, good conversations, 100% private, read our privacy policy and terms here., or" checkable="false" checked="false" clickable="true" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[0,0][1280,2784]">
+          <node index="0" text="" resource-id="" class="com.facebook.react.views.image.ReactImageView" package="ai.rumik.ira.twa" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[0,0][1280,2784]" />
+          <node index="1" text="" resource-id="" class="com.facebook.react.views.view.ReactViewGroup" package="ai.rumik.ira.twa" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[99,1126][1182,2643]">
+            <node index="0" text="meet ira" resource-id="" class="com.facebook.react.views.text.ReactTextView" package="ai.rumik.ira.twa" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[99,1126][1056,1314]" />
+            <node index="1" text="the friend who is always present" resource-id="" class="com.facebook.react.views.text.ReactTextView" package="ai.rumik.ira.twa" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[99,1326][1056,1512]" />
+            <node index="2" text="good conversations, 100% private" resource-id="" class="com.facebook.react.views.text.ReactTextView" package="ai.rumik.ira.twa" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[99,1584][1056,1652]" />
+            <node index="3" text="read our privacy policy and terms here." resource-id="" class="com.facebook.react.views.text.ReactTextView" package="ai.rumik.ira.twa" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[99,1724][1056,1775]" />
+            <node index="4" text="" resource-id="" class="com.facebook.react.views.view.ReactViewGroup" package="ai.rumik.ira.twa" content-desc="" checkable="false" checked="false" clickable="true" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[99,1871][1182,2039]">
+              <node index="0" text="" resource-id="" class="com.facebook.react.views.view.ReactViewGroup" package="ai.rumik.ira.twa" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[99,1871][1182,2039]">
+                <node index="0" text="" resource-id="" class="com.facebook.react.views.view.ReactViewGroup" package="ai.rumik.ira.twa" content-desc="" checkable="false" checked="false" clickable="true" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[102,1874][1179,2036]">
+                  <node index="0" text="" resource-id="" class="com.facebook.react.views.view.ReactViewGroup" package="ai.rumik.ira.twa" content-desc="+91" checkable="false" checked="false" clickable="true" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[150,1922][227,1988]">
+                    <node index="0" text="+91" resource-id="" class="com.facebook.react.views.text.ReactTextView" package="ai.rumik.ira.twa" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[150,1922][227,1988]" />
+                  </node>
+                  <node index="1" text="enter number here" resource-id="" class="com.facebook.react.views.textinput.ReactEditText" package="ai.rumik.ira.twa" content-desc="" checkable="false" checked="false" clickable="true" enabled="true" focusable="true" focused="false" scrollable="false" long-clickable="true" password="false" selected="false" bounds="[302,1913][1131,1997]" />
+                </node>
+              </node>
+            </node>
+            <node index="5" text="" resource-id="" class="com.facebook.react.views.view.ReactViewGroup" package="ai.rumik.ira.twa" content-desc="sign up" checkable="false" checked="false" clickable="true" enabled="false" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[99,2075][1182,2243]">
+              <node index="0" text="sign up" resource-id="" class="com.facebook.react.views.text.ReactTextView" package="ai.rumik.ira.twa" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[548,2117][734,2201]" />
+            </node>
+            <node index="6" text="or" resource-id="" class="com.facebook.react.views.text.ReactTextView" package="ai.rumik.ira.twa" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[622,2291][660,2332]" />
+            <node index="7" text="" resource-id="" class="com.facebook.react.views.view.ReactViewGroup" package="ai.rumik.ira.twa" content-desc="sign up with google" checkable="false" checked="false" clickable="true" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[99,2380][1182,2548]">
+              <node index="0" text="" resource-id="" class="com.facebook.react.views.image.ReactImageView" package="ai.rumik.ira.twa" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[337,2428][409,2500]" />
+              <node index="1" text="sign up with google" resource-id="" class="com.facebook.react.views.text.ReactTextView" package="ai.rumik.ira.twa" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[445,2422][945,2506]" />
+            </node>
+            <node index="8" text="" resource-id="" class="com.facebook.react.views.view.ReactViewGroup" package="ai.rumik.ira.twa" content-desc="need help?" checkable="false" checked="false" clickable="true" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[556,2596][725,2643]">
+              <node index="0" text="need help?" resource-id="" class="com.facebook.react.views.text.ReactTextView" package="ai.rumik.ira.twa" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[556,2596][725,2643]" />
+            </node>
+          </node>
+        </node>
+      </node>
+    </node>
+  </node>
+</hierarchy>
