@@ -3,13 +3,34 @@ import { ElementNotFoundError } from '../errors.js';
 import type { ActionStep, Bounds, ElementSelector, UnifiedUINode } from '../types.js';
 import type { DeviceClient } from './device-client.js';
 import { snapshotTree } from './idle.js';
+import type { RefRegistry } from './ref-registry.js';
 import { findElements } from './tree-parser.js';
 
 // ---------------------------------------------------------------------------
 // Resolve a selector to a single element's center point
 // ---------------------------------------------------------------------------
 
-export function resolveTarget(tree: UnifiedUINode, selector: ElementSelector): UnifiedUINode {
+/**
+ * Resolve a selector to a single element.
+ *
+ * If the selector has a `ref` AND a registry is provided, the ref is
+ * resolved via the registry (O(1) map lookup). Per concern #5 from the
+ * plan review: **ref takes priority** — if ref is set, other selector
+ * fields are ignored. If the ref is stale, the registry throws
+ * `ElementNotFoundError` with an actionable message. No auto-fallback.
+ *
+ * Otherwise, falls back to the classic tree-walk via `findElements`.
+ */
+export function resolveTarget(
+  tree: UnifiedUINode,
+  selector: ElementSelector,
+  registry?: RefRegistry,
+): UnifiedUINode {
+  // Ref short-circuit (per concern #5 — ref wins, no auto-fallback)
+  if (selector.ref && registry) {
+    return registry.resolve(selector.ref);
+  }
+
   const matches = findElements(tree, selector);
 
   if (matches.length === 0) {
@@ -73,10 +94,11 @@ export async function executeAction(
   tree: UnifiedUINode,
   step: ActionStep,
   screenBounds: Bounds,
+  registry?: RefRegistry,
 ): Promise<void> {
   switch (step.action) {
     case 'tap': {
-      const element = resolveTarget(tree, step.target);
+      const element = resolveTarget(tree, step.target, registry);
       await adb.tap(element.center.x, element.center.y);
       break;
     }
@@ -93,7 +115,7 @@ export async function executeAction(
     }
 
     case 'type': {
-      const element = resolveTarget(tree, step.target);
+      const element = resolveTarget(tree, step.target, registry);
       // Tap the field first to focus it, then wait for keyboard to appear
       await adb.tap(element.center.x, element.center.y);
       await sleep(TIMEOUTS.KEYBOARD_SETTLE_MS);
@@ -102,7 +124,7 @@ export async function executeAction(
     }
 
     case 'swipe': {
-      const bounds = step.target ? resolveTarget(tree, step.target).bounds : screenBounds;
+      const bounds = step.target ? resolveTarget(tree, step.target, registry).bounds : screenBounds;
       const coords = computeSwipeCoords(step.direction, bounds);
       const duration = step.durationMs ?? TIMEOUTS.SWIPE_DURATION_MS;
       await adb.swipe(coords.x1, coords.y1, coords.x2, coords.y2, duration);
@@ -116,7 +138,7 @@ export async function executeAction(
     }
 
     case 'double_tap': {
-      const element = resolveTarget(tree, step.target);
+      const element = resolveTarget(tree, step.target, registry);
       await adb.tap(element.center.x, element.center.y);
       await sleep(DOUBLE_TAP.INTERVAL_MS);
       await adb.tap(element.center.x, element.center.y);
@@ -131,7 +153,7 @@ export async function executeAction(
     }
 
     case 'clear_text': {
-      const element = resolveTarget(tree, step.target);
+      const element = resolveTarget(tree, step.target, registry);
       // Tap the field to focus it, then clear
       await adb.tap(element.center.x, element.center.y);
       await adb.clearTextField();
@@ -139,7 +161,7 @@ export async function executeAction(
     }
 
     case 'long_press': {
-      const element = resolveTarget(tree, step.target);
+      const element = resolveTarget(tree, step.target, registry);
       const duration = step.durationMs ?? TIMEOUTS.LONG_PRESS_DURATION_MS;
       await adb.longPress(element.center.x, element.center.y, duration);
       break;
@@ -173,7 +195,7 @@ export async function executeAction(
       const direction = step.direction ?? 'down';
       const maxScrolls = step.maxScrolls ?? SCROLL_TO.MAX_SCROLLS;
       const scrollBounds = step.scrollTarget
-        ? resolveTarget(tree, step.scrollTarget).bounds
+        ? resolveTarget(tree, step.scrollTarget, registry).bounds
         : screenBounds;
 
       for (let i = 0; i < maxScrolls; i++) {
@@ -221,13 +243,81 @@ export interface AssertionResult {
   message: string;
 }
 
-export function checkAssertion(tree: UnifiedUINode, step: ActionStep): AssertionResult {
+/**
+ * Resolve a selector to the first matching element, WITHOUT throwing.
+ * Used by assertions — unlike `resolveTarget`, assertion semantics can
+ * tolerate a missing element (e.g. `assert_not_visible` passes when the
+ * element is absent). When `ref` is set AND a registry is provided, ref
+ * takes priority and falls back to undefined on stale refs.
+ */
+function tryResolve(
+  tree: UnifiedUINode,
+  selector: ElementSelector,
+  registry?: RefRegistry,
+): UnifiedUINode | undefined {
+  if (selector.ref && registry) {
+    try {
+      return registry.resolve(selector.ref);
+    } catch {
+      return undefined;
+    }
+  }
+  const matches = findElements(tree, selector);
+  return matches[0];
+}
+
+/**
+ * Effective label of a node for text assertions — the same priority the
+ * compact serializer uses: text → description → hintText → tooltipText.
+ *
+ * This matters for RN / Flutter / Compose apps where the user-visible
+ * label lives on `content-desc` rather than `text`. A `ReactViewGroup`
+ * wrapping a `Text "delete account"` ends up with empty `.text` but
+ * either a hoisted label or a `description` set by the a11y system —
+ * the LLM is asserting against "what it saw in the compact tree", not
+ * against the raw XML `text` attribute.
+ *
+ * We also recursively check non-interactive descendants: if the node's
+ * effective label comes from a hoisted TextView child, `assert_text_*`
+ * should compare against that child's text too. This matches the user's
+ * mental model — they asserted on what they saw on the ref line.
+ */
+function effectiveTextOf(node: UnifiedUINode): string {
+  const own = node.text || node.description || node.hintText || node.tooltipText;
+  if (own) return own;
+
+  // BFS for the first non-interactive descendant's own text — the same
+  // hoisting priority the compact serializer uses. Interactive
+  // descendants have their own refs, so we don't steal their text.
+  const queue: UnifiedUINode[] = [...node.children];
+  while (queue.length > 0) {
+    const n = queue.shift();
+    if (!n) continue;
+    if (
+      n.clickable ||
+      n.scrollable ||
+      n.checkable ||
+      n.longClickable ||
+      n.className === 'android.widget.EditText'
+    )
+      continue;
+    const label = n.text || n.description || n.hintText || n.tooltipText;
+    if (label) return label;
+    queue.push(...n.children);
+  }
+  return '';
+}
+
+export function checkAssertion(
+  tree: UnifiedUINode,
+  step: ActionStep,
+  registry?: RefRegistry,
+): AssertionResult {
   switch (step.action) {
     case 'assert_visible': {
-      const matches = findElements(tree, step.target);
-      const first = matches[0];
+      const first = tryResolve(tree, step.target, registry);
       return {
-        passed: matches.length > 0,
+        passed: first !== undefined,
         message: first
           ? `Element found: ${describeElement(first)}`
           : `Element not found matching: ${JSON.stringify(step.target)}`,
@@ -235,10 +325,9 @@ export function checkAssertion(tree: UnifiedUINode, step: ActionStep): Assertion
     }
 
     case 'assert_not_visible': {
-      const matches = findElements(tree, step.target);
-      const first = matches[0];
+      const first = tryResolve(tree, step.target, registry);
       return {
-        passed: matches.length === 0,
+        passed: first === undefined,
         message: !first
           ? 'Element correctly not present'
           : `Element unexpectedly found: ${describeElement(first)}`,
@@ -246,15 +335,14 @@ export function checkAssertion(tree: UnifiedUINode, step: ActionStep): Assertion
     }
 
     case 'assert_text_equals': {
-      const matches = findElements(tree, step.target);
-      const first = matches[0];
+      const first = tryResolve(tree, step.target, registry);
       if (!first) {
         return {
           passed: false,
           message: `Element not found matching: ${JSON.stringify(step.target)}`,
         };
       }
-      const actual = first.text;
+      const actual = effectiveTextOf(first);
       return {
         passed: actual === step.value,
         message:
@@ -265,15 +353,14 @@ export function checkAssertion(tree: UnifiedUINode, step: ActionStep): Assertion
     }
 
     case 'assert_text_contains': {
-      const matches = findElements(tree, step.target);
-      const first = matches[0];
+      const first = tryResolve(tree, step.target, registry);
       if (!first) {
         return {
           passed: false,
           message: `Element not found matching: ${JSON.stringify(step.target)}`,
         };
       }
-      const actual = first.text;
+      const actual = effectiveTextOf(first);
       return {
         passed: actual.includes(step.value),
         message: actual.includes(step.value)

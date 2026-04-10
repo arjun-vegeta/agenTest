@@ -1,8 +1,8 @@
-import { DIFF_THRESHOLDS, IDLE_LOADING, LOADING_INDICATORS, TIMEOUTS } from '../constants.js';
+import { IDLE_LOADING, LOADING_INDICATORS, TIMEOUTS } from '../constants.js';
 import { IdleTimeoutError } from '../errors.js';
 import type { UnifiedUINode } from '../types.js';
 import type { DeviceClient } from './device-client.js';
-import { parseUiAutomatorXml } from './tree-parser.js';
+import { computeIdleFingerprint, parseUiAutomatorXml } from './tree-parser.js';
 
 // ---------------------------------------------------------------------------
 // Options
@@ -124,7 +124,7 @@ async function waitForIdleByPolling(device: DeviceClient, opts: IdleOptions): Pr
 
   while (Date.now() - startTime < opts.timeoutMs) {
     const tree = await snapshotTree(device);
-    const fingerprint = computeFingerprint(tree);
+    const fingerprint = computeIdleFingerprint(tree);
 
     if (previousFingerprint !== null && fingerprint === previousFingerprint) {
       stableCount++;
@@ -288,55 +288,8 @@ async function waitForLoadingToFinish(
 }
 
 // ---------------------------------------------------------------------------
-// Tree fingerprinting (for stability comparison)
+// Helpers
 // ---------------------------------------------------------------------------
-
-/**
- * Compute a stable fingerprint of the tree, ignoring known-noisy properties:
- * - Focused state (cursor blink)
- * - Minor bounds jitter (< BOUNDS_JITTER_PX pixels)
- * - Timestamp-like text (e.g. "12:34", "3:45 PM")
- */
-function computeFingerprint(node: UnifiedUINode): string {
-  const parts: string[] = [];
-  collectFingerprint(node, parts);
-  return parts.join('|');
-}
-
-// Matches common time patterns: "12:34", "3:45 PM", "12:34:56"
-const TIMESTAMP_PATTERN = /^\d{1,2}:\d{2}(:\d{2})?(\s?(AM|PM|am|pm))?$/;
-
-function collectFingerprint(node: UnifiedUINode, parts: string[]): void {
-  parts.push(node.role);
-  parts.push(node.resourceId);
-
-  // Skip text that looks like a live timestamp
-  if (node.text && !TIMESTAMP_PATTERN.test(node.text)) {
-    parts.push(node.text);
-  }
-
-  parts.push(node.description);
-
-  // Round bounds to nearest BOUNDS_JITTER_PX to ignore micro-shifts
-  const jitter = DIFF_THRESHOLDS.BOUNDS_JITTER_PX;
-  parts.push(
-    String(roundTo(node.bounds.left, jitter)),
-    String(roundTo(node.bounds.top, jitter)),
-    String(roundTo(node.bounds.right, jitter)),
-    String(roundTo(node.bounds.bottom, jitter)),
-  );
-
-  // Include key state flags (skip focused — cursor blink)
-  parts.push(node.enabled ? '1' : '0', node.checked ? '1' : '0', node.selected ? '1' : '0');
-
-  for (const child of node.children) {
-    collectFingerprint(child, parts);
-  }
-}
-
-function roundTo(value: number, step: number): number {
-  return Math.round(value / step) * step;
-}
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
