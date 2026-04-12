@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 
 const NAV_SECTIONS: Array<{
@@ -29,6 +29,7 @@ const ALL_LINKS = NAV_SECTIONS.flatMap((s) => s.links);
 
 export function DocsSidebar() {
   const pathname = usePathname();
+  const router = useRouter();
 
   return (
     <>
@@ -86,7 +87,7 @@ export function DocsSidebar() {
           <select
             value={pathname}
             onChange={(e) => {
-              window.location.href = e.target.value;
+              router.push(e.target.value);
             }}
             className="flex-1 bg-transparent border border-border/50 rounded-sm pl-3 pr-8 py-1.5 font-mono text-[11px] tracking-[0.1em] uppercase text-fg/80 focus:outline-none focus:border-accent/60 appearance-none bg-no-repeat bg-[right_0.75rem_center] bg-[length:14px_14px]"
             style={{

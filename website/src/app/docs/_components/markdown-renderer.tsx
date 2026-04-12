@@ -6,6 +6,7 @@ import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import rehypeSlug from 'rehype-slug';
 import { Copy, Check } from 'lucide-react';
+import { Img } from '../../_components/img';
 
 function extractText(node: ReactNode): string {
   if (typeof node === 'string') return node;
@@ -159,10 +160,8 @@ const components: Components = {
   td: ({ children }) => (
     <td className="px-4 py-3 border-t border-border/30 text-fg/70">{children}</td>
   ),
-  img: ({ src, alt, ...props }) => (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      {...props}
+  img: ({ src, alt }) => (
+    <Img
       src={typeof src === 'string' ? src : undefined}
       alt={alt ?? ''}
       className="my-6 rounded-sm border border-border/50 max-w-full"

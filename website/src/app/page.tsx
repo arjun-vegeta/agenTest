@@ -1,6 +1,8 @@
 'use client';
 
+import Link from 'next/link';
 import { useState, useRef, useEffect } from 'react';
+import { Img } from './_components/img';
 import { motion, AnimatePresence, useInView, useScroll, useTransform } from 'framer-motion';
 import {
   Copy,
@@ -99,19 +101,7 @@ function Tag({ children }: { children: string }) {
 function useAnimateInView(amount = 0.3) {
   const ref = useRef<HTMLElement>(null);
   const inView = useInView(ref, { once: true, amount });
-  // Detect already-in-viewport at mount (e.g., after browser back / scroll restoration)
-  // so we don't show a blank/blurred state for sections that should be visible right away.
-  const [mountVisible, setMountVisible] = useState(false);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const rect = el.getBoundingClientRect();
-    const winH = window.innerHeight || document.documentElement.clientHeight;
-    if (rect.top < winH * 0.95 && rect.bottom > 0) {
-      setMountVisible(true);
-    }
-  }, []);
-  return { ref, inView: inView || mountVisible };
+  return { ref, inView };
 }
 
 /* ═══════════════════════════════════════════════════════════════ */
@@ -144,17 +134,26 @@ function Navbar() {
 
         {/* center links */}
         <div className="hidden md:flex items-center gap-8">
-          {links.map((l) => (
-            <a
-              key={l.label}
-              href={l.href}
-              target={l.href.startsWith('http') ? '_blank' : undefined}
-              rel={l.href.startsWith('http') ? 'noopener noreferrer' : undefined}
-              className="font-mono text-[11px] tracking-[0.2em] uppercase text-text-muted hover:text-accent transition-colors"
-            >
-              {l.label}
-            </a>
-          ))}
+          {links.map((l) => {
+            const isInternal = l.href.startsWith('/');
+            const cls =
+              'font-mono text-[11px] tracking-[0.2em] uppercase text-text-muted hover:text-accent transition-colors';
+            return isInternal ? (
+              <Link key={l.label} href={l.href} className={cls}>
+                {l.label}
+              </Link>
+            ) : (
+              <a
+                key={l.label}
+                href={l.href}
+                target={l.href.startsWith('http') ? '_blank' : undefined}
+                rel={l.href.startsWith('http') ? 'noopener noreferrer' : undefined}
+                className={cls}
+              >
+                {l.label}
+              </a>
+            );
+          })}
         </div>
 
         {/* right CTA */}
@@ -174,6 +173,170 @@ function Navbar() {
 /* ═══════════════════════════════════════════════════════════════ */
 /*  HERO                                                         */
 /* ═══════════════════════════════════════════════════════════════ */
+
+type TermLine = {
+  text: string;
+  cls: string;
+  delay?: number; // ms before this line appears (overrides default)
+};
+
+const TERMINAL_SCRIPT: TermLine[] = [
+  // 1. User prompt
+  { text: '> Test the login flow end to end.', cls: 'text-fg', delay: 400 },
+
+  // 2. Connect — tool invocation + metadata + compact tree
+  {
+    text: '→ [mcp] agentest_connect { packageName: "com.example.myapp" }',
+    cls: 'text-accent/70 mt-3',
+    delay: 800,
+  },
+  { text: '  deviceId:        emulator-5554', cls: 'text-fg/55 mt-1', delay: 200 },
+  { text: '  backend:         grpc', cls: 'text-fg/55', delay: 180 },
+  { text: '  framework:       react_native', cls: 'text-fg/55', delay: 180 },
+  { text: '  helperInstalled: true', cls: 'text-fg/55', delay: 180 },
+  { text: '  frameworkSync:   ["hermes"]', cls: 'text-fg/55', delay: 200 },
+
+  { text: 'screen 1080x1920 com.example.myapp #a1b2c3', cls: 'text-fg/60 mt-2', delay: 350 },
+  { text: '  "Welcome"', cls: 'text-fg/50', delay: 180 },
+  { text: '  @f1 input "Email"', cls: 'text-fg/50', delay: 180 },
+  { text: '  @f2 input password', cls: 'text-fg/50', delay: 180 },
+  { text: '  @c1 check "Remember me"', cls: 'text-fg/50', delay: 180 },
+  { text: '  @b1 btn "Sign in"', cls: 'text-fg/50', delay: 180 },
+  { text: '  @l1 link "Forgot Password?"', cls: 'text-fg/50', delay: 180 },
+
+  // 3. Run flow — type email, password, tap sign in
+  { text: '→ [mcp] agentest_run_flow', cls: 'text-accent/70 mt-3', delay: 900 },
+  { text: '  [ type   @f1 "user@example.com",', cls: 'text-accent/60', delay: 250 },
+  { text: '    type   @f2 "testpass#123",', cls: 'text-accent/60', delay: 250 },
+  { text: '    tap    @b1 ]', cls: 'text-accent/60', delay: 250 },
+  { text: '  3/3 passed  screenChanged: true  #d2e8f4', cls: 'text-accent/70 mt-1', delay: 600 },
+
+  // 4. Get fresh tree — dashboard
+  { text: '→ [mcp] agentest_get_ui_tree', cls: 'text-accent/70 mt-3', delay: 800 },
+  { text: 'screen 1080x1920 com.example.myapp #d2e8f4', cls: 'text-fg/60 mt-1', delay: 350 },
+  { text: '  "Welcome back"', cls: 'text-fg/50', delay: 180 },
+  { text: '  @s1 scroll "Recent activity"', cls: 'text-fg/50', delay: 180 },
+  { text: '  @b1 btn "Profile"', cls: 'text-fg/50', delay: 180 },
+  { text: '  @b2 btn "Settings"', cls: 'text-fg/50', delay: 180 },
+
+  // 5. AI: navigate to settings
+  { text: '> Open settings and log out.', cls: 'text-fg mt-4', delay: 1100 },
+
+  { text: '→ [mcp] agentest_run_flow', cls: 'text-accent/70 mt-2', delay: 700 },
+  { text: '  [ tap @b2 ]', cls: 'text-accent/60', delay: 250 },
+  { text: '  1/1 passed  screenChanged: true  #e9d4c1', cls: 'text-accent/70 mt-1', delay: 500 },
+
+  { text: 'screen 1080x1920 com.example.myapp #e9d4c1', cls: 'text-fg/60 mt-2', delay: 350 },
+  { text: '  "Settings"', cls: 'text-fg/50', delay: 180 },
+  { text: '  @b1 btn "Account"', cls: 'text-fg/50', delay: 180 },
+  { text: '  @b2 btn "Notifications"', cls: 'text-fg/50', delay: 180 },
+  { text: '  @b3 btn "Log out"', cls: 'text-fg/50', delay: 180 },
+
+  // 6. Log out + assert back at login
+  { text: '→ [mcp] agentest_run_flow', cls: 'text-accent/70 mt-3', delay: 800 },
+  { text: '  [ tap            @b3,', cls: 'text-accent/60', delay: 250 },
+  { text: '    assert_visible { text: "Sign in" } ]', cls: 'text-accent/60', delay: 250 },
+  { text: '  2/2 passed  screenChanged: true', cls: 'text-accent/70 mt-1', delay: 500 },
+
+  // 7. AI summary
+  { text: '> Login flow confirmed using AgenTest ✓', cls: 'text-fg mt-4', delay: 1200 },
+];
+
+const AGENTS = ['claude', 'codex', 'cursor', 'replit', 'antigravity'];
+
+function AnimatedTerminal() {
+  const [count, setCount] = useState(0);
+  const [agentIdx, setAgentIdx] = useState(0);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (count >= TERMINAL_SCRIPT.length) {
+      // Loop after pause
+      const restart = setTimeout(() => setCount(0), 5500);
+      return () => clearTimeout(restart);
+    }
+    const base = TERMINAL_SCRIPT[count]?.delay ?? 250;
+    const delay = Math.round(base * 1.2);
+    const t = setTimeout(() => setCount((c) => c + 1), delay);
+    return () => clearTimeout(t);
+  }, [count]);
+
+  // Flip agent name every 2.2s
+  useEffect(() => {
+    const t = setInterval(() => {
+      setAgentIdx((i) => (i + 1) % AGENTS.length);
+    }, 2200);
+    return () => clearInterval(t);
+  }, []);
+
+  // Auto-scroll to bottom on new line
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+  }, [count]);
+
+  const visible = TERMINAL_SCRIPT.slice(0, count);
+
+  return (
+    <div className="glass rounded-md overflow-hidden relative">
+      <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border/40">
+        <div className="flex gap-1.5">
+          {[0.4, 0.25, 0.15].map((o, i) => (
+            <motion.div
+              key={i}
+              className="w-2 h-2 rounded-full"
+              style={{ backgroundColor: `rgba(16,185,129,${o})` }}
+              animate={{ opacity: [0.5, 1, 0.5] }}
+              transition={{ duration: 2, repeat: Infinity, delay: i * 0.3 }}
+            />
+          ))}
+        </div>
+        <span className="ml-2 font-mono text-[9px] tracking-[0.25em] uppercase text-text-muted flex items-baseline gap-1.5">
+          your ai agent —
+          <AnimatePresence mode="wait">
+            <motion.span
+              key={AGENTS[agentIdx]}
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 4 }}
+              transition={{ duration: 0.25, ease: 'easeOut' }}
+              className="text-accent/80 inline-block"
+            >
+              {AGENTS[agentIdx]}
+            </motion.span>
+          </AnimatePresence>
+        </span>
+      </div>
+
+      <div
+        ref={scrollRef}
+        className="p-5 font-mono text-[12px] leading-[2.1] h-[340px] overflow-y-auto bg-black/40 relative scroll-smooth"
+        style={{ scrollbarWidth: 'none' }}
+      >
+        <style>{`.terminal-scroll::-webkit-scrollbar { display: none; }`}</style>
+        {visible.map((line, i) => (
+          <motion.div
+            key={i}
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.25, ease: 'easeOut' }}
+            className={line.cls}
+          >
+            {line.text || '\u00A0'}
+          </motion.div>
+        ))}
+        {count < TERMINAL_SCRIPT.length && (
+          <motion.span
+            className="inline-block w-[7px] h-[14px] bg-accent/80 align-middle ml-0.5"
+            animate={{ opacity: [1, 0] }}
+            transition={{ duration: 0.8, repeat: Infinity, repeatType: 'reverse' }}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
 
 function Hero() {
   const containerRef = useRef(null);
@@ -290,50 +453,7 @@ function Hero() {
             ease: [0.22, 1, 0.36, 1] as unknown as [number, number, number, number],
           }}
         >
-          <div className="glass rounded-md overflow-hidden relative">
-            <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border/40">
-              <div className="flex gap-1.5">
-                {[0.4, 0.25, 0.15].map((o, i) => (
-                  <motion.div
-                    key={i}
-                    className="w-2 h-2 rounded-full"
-                    style={{ backgroundColor: `rgba(16,185,129,${o})` }}
-                    animate={{ opacity: [0.5, 1, 0.5] }}
-                    transition={{ duration: 2, repeat: Infinity, delay: i * 0.3 }}
-                  />
-                ))}
-              </div>
-              <span className="ml-2 font-mono text-[9px] tracking-[0.25em] uppercase text-text-muted">
-                agentest_server — running
-              </span>
-            </div>
-
-            <div className="p-5 font-mono text-[12px] leading-[2.1] min-h-[280px] bg-black/40 relative">
-              <div className="term-line text-fg/60">
-                <span className="text-accent">&gt;</span> &quot;Test the signup flow&quot;
-              </div>
-              <div className="term-line text-accent/70 mt-3">
-                [agentest_connect] emulator-5554 via gRPC
-              </div>
-              <div className="term-line text-text-muted mt-1">
-                screen 1280x2856 com.example.app #a1b2c3
-              </div>
-              <div className="term-line text-text-muted/60 ml-4">@b1 btn &quot;Sign in&quot;</div>
-              <div className="term-line text-text-muted/60 ml-4">@f1 input &quot;Email&quot;</div>
-              <div className="term-line text-text-muted/60 ml-4">
-                @f2 input &quot;Password&quot;
-              </div>
-              <div className="term-line text-accent/70 mt-3">[agentest_run_flow] 3/3 passed</div>
-              <div className="term-line text-accent/50 ml-4">
-                &#10003; type @f1 &quot;user@test.com&quot;
-              </div>
-              <div className="term-line text-accent/50 ml-4">
-                &#10003; type @f2 &quot;password123&quot;
-              </div>
-              <div className="term-line text-accent/50 ml-4">&#10003; tap @b1</div>
-              <div className="term-caret mt-2" />
-            </div>
-          </div>
+          <AnimatedTerminal />
         </motion.div>
       </div>
     </section>
@@ -607,18 +727,22 @@ function Setup() {
               AgenTest works with any MCP-compatible AI coding agent. Four lines of JSON in your
               agent&apos;s config and you&apos;re running. No SDK, no plugins, no setup.
             </motion.p>
-            <motion.a
+            <motion.div
               custom={3}
               variants={blurUp}
               initial="hidden"
               animate={inView ? 'visible' : 'hidden'}
-              href="/docs/setup"
-              className="inline-block mt-8 font-mono text-[11px] tracking-[0.18em] uppercase border border-accent/30 px-5 py-2.5 text-accent/80 hover:bg-accent/10 hover:text-accent transition-all rounded-sm"
               whileHover={{ scale: 1.03 }}
               transition={snappy}
+              className="inline-block mt-8"
             >
-              [STEPS_TO_ADD_MCP]
-            </motion.a>
+              <Link
+                href="/docs/setup"
+                className="inline-block font-mono text-[11px] tracking-[0.18em] uppercase border border-accent/30 px-5 py-2.5 text-accent/80 hover:bg-accent/10 hover:text-accent transition-all rounded-sm"
+              >
+                [STEPS_TO_ADD_MCP]
+              </Link>
+            </motion.div>
           </div>
         </div>
 
@@ -643,8 +767,7 @@ function Setup() {
                     key={`${dup}-${a.name}`}
                     className="flex flex-col items-center gap-3 cursor-default group px-12 md:px-16 shrink-0"
                   >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
+                    <Img
                       src={a.logo}
                       alt={a.name}
                       className="w-10 h-10 md:w-12 md:h-12 opacity-70 group-hover:opacity-100 transition-opacity"
@@ -874,8 +997,7 @@ function Footer() {
                     rel="noopener noreferrer"
                     className="text-[12px] text-text-dim hover:text-accent transition-colors flex items-center gap-2 tracking-[0.04em]"
                   >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src="/github.svg" alt="" className="w-3 h-3" /> GitHub
+                    <Img src="/github.svg" alt="" className="w-3 h-3" /> GitHub
                   </a>
                 </li>
                 <li>
@@ -904,12 +1026,12 @@ function Footer() {
                   { label: 'Examples', href: '/docs/examples' },
                 ].map((d) => (
                   <li key={d.label}>
-                    <a
+                    <Link
                       href={d.href}
                       className="text-[12px] text-text-dim hover:text-accent transition-colors tracking-[0.04em]"
                     >
                       {d.label}
-                    </a>
+                    </Link>
                   </li>
                 ))}
               </ul>
