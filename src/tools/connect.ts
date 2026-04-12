@@ -47,7 +47,7 @@ export interface ConnectResult {
   /**
    * Trace lines explaining what happened during framework detection +
    * sync attach. This is the in-band replacement for stderr-based
-   * diagnostics, which Claude Code's MCP client silently drops after
+   * diagnostics, which the MCP client silently drops after
    * the initial handshake — without these the LLM has no visibility
    * into why a framework sync channel failed to attach.
    *
@@ -166,7 +166,7 @@ export async function handleConnect(
   await deviceForLaunch.launchApp(packageName);
 
   // In-band diagnostic trace surfaced through the connect response so the
-  // LLM can see exactly which step succeeded or failed. Claude Code's MCP
+  // LLM can see exactly which step succeeded or failed. the MCP
   // client drops post-startup stderr; this is the replacement channel.
   const diagnostics: string[] = [];
 

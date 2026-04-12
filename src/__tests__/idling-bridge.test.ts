@@ -150,7 +150,7 @@ describe('FrameworkSync + idling bridge', () => {
 
 // ---------------------------------------------------------------------------
 // Stale-bridge warning: catches the "user updated AgenTest but forgot to
-// rebuild their Android app" case so Claude can tell them to rebuild.
+// rebuild their Android app" case so the AI can tell them to rebuild.
 // ---------------------------------------------------------------------------
 
 describe('FrameworkSync.idlingBridgeWarning', () => {

@@ -21,6 +21,7 @@ export const SERVER_VERSION = '0.1.0';
 // ---------------------------------------------------------------------------
 
 export const ADB = {
+  /** Resolved at runtime by resolveAdbPath() — this is just the fallback. */
   BINARY: 'adb',
   SHELL: 'shell',
   EXEC_OUT: 'exec-out',
@@ -324,7 +325,7 @@ export const LOADING_INDICATORS = {
 
 export const IDLE_LOADING = {
   /** Max time to wait for loading indicators to disappear after tree stabilizes (ms).
-   *  Kept short (8s) so the server returns control to Claude quickly.
+   *  Kept short (8s) so the server returns control to the AI agent quickly.
    *  If loading is still in progress, the next step's idle detection will pick it up. */
   MAX_LOADING_WAIT_MS: 8_000,
   /** Poll interval when waiting for loading indicators to disappear (ms) */

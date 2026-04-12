@@ -209,7 +209,7 @@ describe('Metro-first RN detection in handleConnect', () => {
   // -------------------------------------------------------------------------
   // Diagnostics surfacing — connect response carries an in-band trace so the
   // LLM can see exactly which step succeeded or failed. This is the
-  // workaround for Claude Code's MCP client dropping post-startup stderr.
+  // workaround for the MCP client dropping post-startup stderr.
   // -------------------------------------------------------------------------
 
   it('surfaces a [metro] diagnostic line when discovery probe runs', async () => {

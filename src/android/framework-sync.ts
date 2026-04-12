@@ -90,10 +90,10 @@ export class FrameworkSync {
 
   /**
    * Captured human-readable diagnostic lines from `attach()`. We tee these
-   * to stderr (helpful for non-Claude-Code MCP clients) AND keep them in
+   * to stderr (helpful for other MCP clients) AND keep them in
    * memory so the connect tool can surface them in its JSON response.
    *
-   * Why we duplicate: Claude Code's MCP client only forwards agentest
+   * Why we duplicate: the MCP client only forwards agentest
    * stderr at startup; every subsequent console.error during a tool call
    * is dropped on the floor. Without an in-band channel, framework-sync
    * failures are completely opaque to the developer. The connect response
