@@ -24,7 +24,7 @@
  * Why the two-call pattern: Hermes's CDP `awaitPromise: true` flag is
  * unreliable — `Promise.resolve(42)` returns the internal Promise
  * representation instead of the awaited value. We confirmed this
- * empirically against the Ira live emulator on 2026-04-10. The two-call
+ * empirically against the example chat app on 2026-04-10. The two-call
  * stateful pattern sidesteps the issue entirely: every piece of code
  * sent to Hermes is pure synchronous, and async measurements are
  * collected via a global rendezvous point.

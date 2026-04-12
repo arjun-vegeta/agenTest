@@ -61,7 +61,7 @@ function createNativeLookingShell(): MockShellExecutor {
     `<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
 <hierarchy rotation="0">
   <node index="0" text="" resource-id="" class="android.widget.FrameLayout"
-    package="ai.rumik.ira.twa" content-desc="" checkable="false" checked="false"
+    package="com.example.chatapp" content-desc="" checkable="false" checked="false"
     clickable="false" enabled="true" focusable="false" focused="false"
     scrollable="false" long-clickable="false" password="false" selected="false"
     bounds="[0,0][1280,2856]" />
@@ -97,9 +97,9 @@ describe('Metro-first RN detection in handleConnect', () => {
     stubMetro([
       {
         id: '8c0b565cb71ae217fa87310a694d4fca979c96fa-1',
-        title: 'ai.rumik.ira.twa (sdk_gphone64_arm64)',
+        title: 'com.example.chatapp (sdk_gphone64_arm64)',
         description: 'React Native Bridge [C++ connection]',
-        appId: 'ai.rumik.ira.twa',
+        appId: 'com.example.chatapp',
         type: 'node',
         webSocketDebuggerUrl:
           'ws://127.0.0.1:8081/inspector/debug?device=8c0b565cb71ae217fa87310a694d4fca979c96fa&page=1',
@@ -107,7 +107,7 @@ describe('Metro-first RN detection in handleConnect', () => {
     ]);
 
     const shell = createNativeLookingShell();
-    const result = await handleConnect(shell, 'ai.rumik.ira.twa');
+    const result = await handleConnect(shell, 'com.example.chatapp');
 
     expect(result.framework).toBe('react_native');
   });
@@ -187,8 +187,8 @@ describe('Metro-first RN detection in handleConnect', () => {
       json: async () => [
         {
           id: 'page-1',
-          title: 'ai.rumik.ira.twa',
-          appId: 'ai.rumik.ira.twa',
+          title: 'com.example.chatapp',
+          appId: 'com.example.chatapp',
           description: 'React Native Bridge',
           type: 'node',
           webSocketDebuggerUrl: 'ws://127.0.0.1:8081/inspector/debug?device=0&page=1',
@@ -198,7 +198,7 @@ describe('Metro-first RN detection in handleConnect', () => {
     vi.stubGlobal('fetch', fetchSpy);
 
     const shell = createNativeLookingShell();
-    const result = await handleConnect(shell, 'ai.rumik.ira.twa');
+    const result = await handleConnect(shell, 'com.example.chatapp');
 
     // Even with a Metro response that would normally flip the framework,
     // the env var must short-circuit the probe entirely.
@@ -216,8 +216,8 @@ describe('Metro-first RN detection in handleConnect', () => {
     stubMetro([
       {
         id: 'page-1',
-        title: 'ai.rumik.ira.twa',
-        appId: 'ai.rumik.ira.twa',
+        title: 'com.example.chatapp',
+        appId: 'com.example.chatapp',
         description: 'React Native Bridge',
         type: 'node',
         webSocketDebuggerUrl: 'ws://127.0.0.1:8081/inspector/debug?device=0&page=1',
@@ -225,7 +225,7 @@ describe('Metro-first RN detection in handleConnect', () => {
     ]);
 
     const shell = createNativeLookingShell();
-    const result = await handleConnect(shell, 'ai.rumik.ira.twa');
+    const result = await handleConnect(shell, 'com.example.chatapp');
 
     expect(result.diagnostics).toBeDefined();
     const all = (result.diagnostics ?? []).join('\n');

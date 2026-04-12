@@ -104,12 +104,12 @@ describe('hoistClickableLabels', () => {
     // We assert on the COMPACT OUTPUT (what the LLM sees) rather than the
     // raw hoisted map because the serializer also does transparent
     // collapse on unlabeled wrapper-of-interactives: the outer/inner
-    // "phone row" wrappers in the Ira fixture intentionally don't get
+    // "phone row" wrappers in the chat fixture intentionally don't get
     // their own refs (their children are addressable directly), so they
     // won't appear in the hoisted map either. What matters is that the
     // LLM ends up with an addressable, labeled entry for every real
     // affordance on the screen.
-    const tree = loadTree('ira-login-rn.xml');
+    const tree = loadTree('chat-login-rn.xml');
     const compact = serializeTreeCompact(tree);
 
     // Every labeled CTA must appear once — and only once — in the final
@@ -226,8 +226,8 @@ describe('byte-size regression', () => {
     expect(compact.text.length).toBeLessThan(400);
   });
 
-  it('Ira RN login (zero-a11y) compact format is < 700 bytes', () => {
-    const tree = loadTree('ira-login-rn.xml');
+  it('chat RN login (zero-a11y) compact format is < 700 bytes', () => {
+    const tree = loadTree('chat-login-rn.xml');
     const compact = serializeTreeCompact(tree);
     expect(compact.text.length).toBeLessThan(700);
   });
@@ -245,14 +245,14 @@ describe('byte-size regression', () => {
     expect(ratio).toBeGreaterThanOrEqual(3);
   });
 
-  it('compact format beats JSON tree by at least 4x on Ira RN fixture (the target user case)', () => {
-    const tree = loadTree('ira-login-rn.xml');
+  it('compact format beats JSON tree by at least 4x on chat RN fixture (the target user case)', () => {
+    const tree = loadTree('chat-login-rn.xml');
     const compact = serializeTreeCompact(tree);
     const json = JSON.stringify(serializeTreeForLlm(tree), null, 2);
     const ratio = json.length / compact.text.length;
     // eslint-disable-next-line no-console
     console.log(
-      `[compact-tree] ira: JSON=${json.length}b compact=${compact.text.length}b ratio=${ratio.toFixed(2)}x`,
+      `[compact-tree] chat: JSON=${json.length}b compact=${compact.text.length}b ratio=${ratio.toFixed(2)}x`,
     );
     expect(ratio).toBeGreaterThanOrEqual(4);
   });

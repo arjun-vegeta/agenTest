@@ -256,7 +256,7 @@ This is the common case for apps built with code-generation tools (Cursor, Bolt,
 ```json
 // Response excerpt
 {
-  "uiTree": "screen 1440x2960 com.expo.app #a1b2c3\n  \"Welcome\"\n  @f1 input \"you@example.com\"\n  @f2 input password\n  @b1 btn \"Sign in\"\n  \"or\"\n  @b2 btn \"Sign up\"",
+  "uiTree": "screen 1440x2960 com.example.app #a1b2c3\n  \"Welcome\"\n  @f1 input \"you@example.com\"\n  @f2 input password\n  @b1 btn \"Sign in\"\n  \"or\"\n  @b2 btn \"Sign up\"",
   "screenFingerprint": "a1b2c3",
   "framework": "react_native",
   "frameworkSync": ["hermes"]
