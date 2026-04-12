@@ -32,7 +32,7 @@ npm install -g agentest
 Or from source:
 
 ```bash
-git clone https://github.com/AgenTest-AI/agentest.git
+git clone https://github.com/arjun-vegeta/agenTest.git
 cd agentest
 npm install && npm run build
 ```
@@ -40,10 +40,12 @@ npm install && npm run build
 ### 2. Prerequisites
 
 - **Node.js** >= 18
-- **Android SDK** with `adb` on your PATH
+- **Android SDK** installed (Android Studio or standalone SDK)
 - **Android emulator** running (or physical device via USB)
 
-Verify: `adb devices` should list at least one device.
+AgenTest auto-discovers `adb` from standard SDK locations -- no PATH configuration needed. It checks `ANDROID_HOME`, `ANDROID_SDK_ROOT`, `~/Library/Android/sdk` (macOS), `~/Android/Sdk` (Linux), and `%LOCALAPPDATA%\Android\Sdk` (Windows).
+
+Verify your emulator is running: `adb devices` should list at least one device.
 
 ### 3. Configure your AI agent
 
@@ -96,11 +98,6 @@ Add AgenTest as an MCP server. The config format depends on your agent:
   }
 }
 ```
-
-> If `adb` isn't on your default PATH, add it via env:
-> ```json
-> "env": { "PATH": "/path/to/android/sdk/platform-tools:/usr/bin:/bin" }
-> ```
 
 ### 4. Use it
 
@@ -216,6 +213,66 @@ dependencies {
 ```
 
 AgenTest auto-detects it on the next connect. See [docs/setup.md](docs/setup.md) for details.
+
+## Troubleshooting
+
+### `adb` not found
+
+AgenTest auto-discovers `adb` from standard locations. If it still can't find it:
+
+1. **Set `ANDROID_HOME`** in your shell profile:
+   ```bash
+   # macOS / Linux
+   export ANDROID_HOME=~/Library/Android/sdk   # macOS
+   export ANDROID_HOME=~/Android/Sdk           # Linux
+
+   # Windows (PowerShell)
+   $env:ANDROID_HOME = "$env:LOCALAPPDATA\Android\Sdk"
+   ```
+
+2. **Or pass PATH explicitly** in your MCP config:
+   ```json
+   {
+     "mcpServers": {
+       "agentest": {
+         "command": "npx",
+         "args": ["-y", "agentest"],
+         "env": {
+           "PATH": "/path/to/android/sdk/platform-tools:/usr/local/bin:/usr/bin:/bin"
+         }
+       }
+     }
+   }
+   ```
+
+### No devices found
+
+- Make sure your emulator is fully booted (past the Android boot animation)
+- Run `adb devices` manually -- you should see at least one `device` (not `offline` or `unauthorized`)
+- Try `adb kill-server && adb start-server` to reset the connection
+
+### Helper APK didn't install
+
+If `agentest_connect` returns `"helperInstalled": false`, AgenTest falls back to the slower ADB path automatically. Everything still works, just ~3-5x slower tree reads. To fix:
+
+- Check that the emulator has enough disk space
+- Make sure the emulator is fully booted before connecting
+- Try `adb uninstall com.agentest.helper.test && adb uninstall com.agentest.helper` then reconnect
+
+### UI tree is empty
+
+- The app may still be loading. Wait a moment and call `agentest_get_ui_tree` again
+- Some screens (splash, OpenGL/SurfaceView) don't expose accessibility nodes
+- Use `agentest_screenshot` as a fallback to see what's on screen
+
+### Slow performance
+
+AgenTest has three speed tiers:
+1. **Helper + gRPC** (~150-400ms/action) -- best, emulator only
+2. **Helper + ADB** (~300-600ms/action) -- physical devices
+3. **ADB only** (~1.5-3s/action) -- fallback when helper can't install
+
+If you're stuck on tier 3, check the helper install issue above.
 
 ## Documentation
 

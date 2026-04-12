@@ -1,6 +1,6 @@
 {
   "name": "agentest",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "AI-driven mobile app testing via MCP — any AI agent can test any Android app",
   "type": "module",
   "main": "dist/server.js",
@@ -22,11 +22,11 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/AgenTest-AI/agentest.git"
+    "url": "https://github.com/arjun-vegeta/agenTest.git"
   },
-  "homepage": "https://github.com/AgenTest-AI/agentest",
+  "homepage": "https://github.com/arjun-vegeta/agenTest",
   "bugs": {
-    "url": "https://github.com/AgenTest-AI/agentest/issues"
+    "url": "https://github.com/arjun-vegeta/agenTest/issues"
   },
   "author": "AgenTest",
   "scripts": {
@@ -46,6 +46,7 @@
   },
   "files": [
     "dist/**/*",
+    "!dist/__tests__/**",
     "android-helper/prebuilt/agentest-helper.apk",
     "android-helper/prebuilt/agentest-helper-test.apk",
     "android-helper/prebuilt/agentest-idling-bridge.aar"

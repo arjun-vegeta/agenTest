@@ -14,9 +14,9 @@
 
 import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { platform } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { resolveAdbPath } from '../adb-path.js';
 
 import { HELPER } from '../constants.js';
 import type { ShellExecutor } from '../types.js';
@@ -221,11 +221,7 @@ function spawnInstrumentation(deviceId?: string): ChildProcess | null {
   }
   args.push('shell', 'am', 'instrument', '-w', '-r', `${HELPER.TEST_PACKAGE}/${HELPER.RUNNER}`);
 
-  // On Windows, Node's child_process.spawn uses libuv's CreateProcess which
-  // searches PATH for `.exe`/`.cmd`/`.bat` — but is less reliable than the
-  // Unix execvp path. Be explicit about the binary name on Windows so we
-  // pick up `adb.exe` even if the user's PATH has only `adb` (no extension).
-  const adbBinary = platform() === 'win32' ? 'adb.exe' : 'adb';
+  const adbBinary = resolveAdbPath();
 
   let proc: ChildProcess;
   try {

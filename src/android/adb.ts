@@ -1,3 +1,4 @@
+import { resolveAdbPath } from '../adb-path.js';
 import {
   ADB,
   ADB_COMMANDS,
@@ -25,7 +26,7 @@ export class AdbClient {
   // -----------------------------------------------------------------------
 
   private buildCommand(...args: string[]): string {
-    const parts: string[] = [ADB.BINARY];
+    const parts: string[] = [resolveAdbPath()];
     if (this.deviceId) {
       parts.push(ADB.DEVICE_FLAG, this.deviceId);
     }
