@@ -435,8 +435,6 @@ function rectContains(
   );
 }
 
-
-
 /**
  * Flatten the fiber map to a `Map<nodeId, string>` — what
  * `hoistClickableLabels` expects as its `externalLabels` argument.
@@ -496,8 +494,7 @@ function dedupeFibers(fibers: FiberNode[]): FiberNode[] {
     if (!f.component || GENERIC_COMPONENTS.has(f.component)) {
       // Component not useful as a grouping key — keep fiber as-is if
       // it has explicit props, drop otherwise.
-      const hasProps =
-        !!f.props['testID'] || !!f.props['accessibilityLabel'] || !!f.props['name'];
+      const hasProps = !!f.props['testID'] || !!f.props['accessibilityLabel'] || !!f.props['name'];
       if (!hasProps) continue;
     }
 
@@ -630,4 +627,3 @@ function calibrateOffset(
     offsetY: dyStr ? Number(dyStr) : 0,
   };
 }
-

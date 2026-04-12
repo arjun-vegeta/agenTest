@@ -14,7 +14,7 @@ export const TOOL_NAMES = {
 // ---------------------------------------------------------------------------
 
 export const SERVER_NAME = 'agentest';
-export const SERVER_VERSION = '0.1.0';
+export const SERVER_VERSION = '0.1.1';
 
 // ---------------------------------------------------------------------------
 // ADB Command Fragments

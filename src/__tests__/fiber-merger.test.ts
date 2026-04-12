@@ -2,10 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { FiberNode } from '../android/fiber-extractor.js';
-import {
-  fiberLabelsToPlainMap,
-  mergeFiberLabels,
-} from '../android/fiber-merger.js';
+import { fiberLabelsToPlainMap, mergeFiberLabels } from '../android/fiber-merger.js';
 import { parseUiAutomatorXml, serializeTreeCompact } from '../android/tree-parser.js';
 import type { UnifiedUINode } from '../types.js';
 import { UNIFIED_ROLES } from '../types.js';
@@ -522,9 +519,7 @@ describe('mergeFiberLabels — Ira RN profile fixture', () => {
 
     expect(result.text).toContain('ArrowLeft');
     // The label appears on a ref line (the clickable becomes addressable).
-    const refLine = result.text
-      .split('\n')
-      .find((l) => l.includes('ArrowLeft'));
+    const refLine = result.text.split('\n').find((l) => l.includes('ArrowLeft'));
     expect(refLine).toBeDefined();
     expect(refLine).toMatch(/@[bfclsg]\d+/); // has a ref token
   });

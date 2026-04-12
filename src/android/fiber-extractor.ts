@@ -267,9 +267,7 @@ export const FIBER_MEASURE_DELAY_MS = 150;
  * wait). Returns null on any failure: no hook, stale Hermes connection,
  * parse error, etc. Silent degradation.
  */
-export async function extractReactFiberTree(
-  client: HermesCdpClient,
-): Promise<FiberNode[] | null> {
+export async function extractReactFiberTree(client: HermesCdpClient): Promise<FiberNode[] | null> {
   let raw: unknown;
   try {
     raw = await client.evaluate(FIBER_WALKER_EXPR);

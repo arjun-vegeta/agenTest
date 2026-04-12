@@ -31,10 +31,7 @@ export class RefRegistry {
    * Returns the compact serialization result so callers that need the text
    * or fingerprint don't have to compute it again.
    */
-  rebuild(
-    tree: UnifiedUINode,
-    opts?: CompactSerializeOptions,
-  ): CompactSerializeResult {
+  rebuild(tree: UnifiedUINode, opts?: CompactSerializeOptions): CompactSerializeResult {
     this.lastResult = serializeTreeCompact(tree, opts);
     this.refMap.clear();
     for (const [ref, node] of this.lastResult.refMap) {
