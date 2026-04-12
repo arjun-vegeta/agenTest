@@ -256,7 +256,7 @@ This is the common case for apps built with code-generation tools (Cursor, Bolt,
 ```json
 // Response excerpt
 {
-  "uiTree": "screen 1440x2960 com.expo.app #a1b2c3\n  \"Welcome to Ira\"\n  @f1 input \"you@example.com\"\n  @f2 input password\n  @b1 btn \"Sign in\"\n  \"or\"\n  @b2 btn \"Sign up\"",
+  "uiTree": "screen 1440x2960 com.expo.app #a1b2c3\n  \"Welcome\"\n  @f1 input \"you@example.com\"\n  @f2 input password\n  @b1 btn \"Sign in\"\n  \"or\"\n  @b2 btn \"Sign up\"",
   "screenFingerprint": "a1b2c3",
   "framework": "react_native",
   "frameworkSync": ["hermes"]
@@ -284,9 +284,9 @@ The header has screen size, package, and fingerprint. Every operable gets a `@re
 On a chat screen with no testIDs and only icon buttons:
 
 ```
-screen 1440x2960 ai.rumik.ira.twa #f9e8d7
+screen 1440x2960 com.example.chatapp #f9e8d7
   @b1 btn "ArrowLeft"       ← Lucide component
-  "Ira"
+  "Chat"
   @b2 btn "Phone"
   @b3 btn "DotsVertical"
   @g1 @ref scroll
@@ -325,7 +325,7 @@ When you have a React Native app running in a dev build with Metro on port 8081,
 
 ```json
 {
-  "packageName": "ai.rumik.ira.twa"
+  "packageName": "com.example.chatapp"
 }
 ```
 
@@ -334,7 +334,7 @@ Response (lean, no diagnostics — success path):
 ```json
 {
   "deviceId": "emulator-5554",
-  "packageName": "ai.rumik.ira.twa",
+  "packageName": "com.example.chatapp",
   "backend": "grpc",
   "helperInstalled": true,
   "framework": "react_native",
@@ -342,7 +342,7 @@ Response (lean, no diagnostics — success path):
   "uiTree": {
     "role": "container",
     "bounds": "[0,0][1280,2784]",
-    "id": "ai.rumik.ira.twa:id/action_bar_root",
+    "id": "com.example.chatapp:id/action_bar_root",
     "children": [/* ... */]
   }
 }
@@ -350,7 +350,7 @@ Response (lean, no diagnostics — success path):
 
 `frameworkSync: ["hermes"]` confirms that:
 1. Helper detection first returned `native` (RN Fabric flattens views, so no `ReactRootView` classes in the a11y tree, and on API 34+ `/proc/<pid>/maps` is SELinux-blocked from shell UID).
-2. The Metro `/json/list` backstop fetched the debug target list, found two Hermes pages with `appId === "ai.rumik.ira.twa"`, and overrode the framework to `react_native`.
+2. The Metro `/json/list` backstop fetched the debug target list, found two Hermes pages with `appId === "com.example.chatapp"`, and overrode the framework to `react_native`.
 3. `FrameworkSync.attach()` then opened the CDP WebSocket to the first page, ran `Runtime.enable`, and is now alive in the session.
 
 ### Step 2: Run a flow and watch the per-step durations
@@ -370,7 +370,7 @@ Each heavy action (tap, swipe, double_tap, long_press) now composes **three** si
 - Hermes CDP `Runtime.evaluate("Promise.resolve(1)")` round-trip (~20-80ms; proves the JS event loop is responsive)
 - Loading-indicator visibility check
 
-On the `ai.rumik.ira.twa` build this typically resolves in ~1.3-1.5s per heavy action on an API 36 emulator — 2-3× faster than the pre-Phase-3.5 polling path.
+On the `com.example.chatapp` build this typically resolves in ~1.3-1.5s per heavy action on an API 36 emulator — 2-3× faster than the pre-Phase-3.5 polling path.
 
 ### What happens in release builds
 

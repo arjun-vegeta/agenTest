@@ -274,7 +274,7 @@ describe('mergeFiberLabels — Stage B (containment)', () => {
   });
 
   it('picks the SVG icon (tight container) over a wrapper RCTView (broader)', () => {
-    // This is the Ira profile screen "back button" case. The a11y tree
+    // This is the chat profile screen "back button" case. The a11y tree
     // has one clickable at [60,192,132,264] (72×72). The fiber tree has:
     //   - a Pressable RCTView at the same bounds with component=ProfilePage
     //   - an SVG inside with component=ArrowLeft
@@ -454,15 +454,15 @@ describe('mergeFiberLabels — generic component filtering', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Real-world fixture — Ira app profile screen
+// Real-world fixture — chat app profile screen
 // ---------------------------------------------------------------------------
 
-describe('mergeFiberLabels — Ira RN profile fixture', () => {
+describe('mergeFiberLabels — chat RN profile fixture', () => {
   it('produces labels for unlabeled interactives using real fiber data', () => {
-    const tree = loadTree('ira-login-rn.xml');
-    const fibers = loadFibers('ira-profile-fibers.json');
+    const tree = loadTree('chat-login-rn.xml');
+    const fibers = loadFibers('chat-profile-fibers.json');
 
-    // The Ira fixture has no bounds on fibers (we synthesized it without
+    // The chat fixture has no bounds on fibers (we synthesized it without
     // measurements). So Stage A is what we exercise here: testID and
     // accessibilityLabel matching. Density=0 disables Stage B.
     const labels = mergeFiberLabels(tree, fibers, 0);
@@ -474,7 +474,7 @@ describe('mergeFiberLabels — Ira RN profile fixture', () => {
     // for enrichment.
     //
     // The real win shows up on a screen where the a11y tree has
-    // UNLABELED clickables (like the Ira chat screen's icon buttons).
+    // UNLABELED clickables (like the chat screen's icon buttons).
     // The fiber data we captured includes Camera/Photo/HangoutIcon
     // entries that WOULD label those if the a11y fixture contained
     // them without descriptions. The fiber-merger unit here just
