@@ -1,7 +1,7 @@
 {
   "ok": true,
   "count": 25,
-  "_comment": "Synthesized from live fiber walker output against ai.rumik.ira.twa on 2026-04-10. Preserves the structure we observed: host fibers wrapped by Lucide icon components (ArrowLeft, Settings, Pencil, BrandX, etc.), with some already having accessibilityLabel props. Used as a test fixture for fiber-merger.",
+  "_comment": "Synthesized from live fiber walker output against com.example.chatapp on 2026-04-10. Preserves the structure we observed: host fibers wrapped by Lucide icon components (ArrowLeft, Settings, Pencil, BrandX, etc.), with some already having accessibilityLabel props. Used as a test fixture for fiber-merger.",
   "nodes": [
     {
       "tag": 21009,
@@ -58,7 +58,7 @@
       "component": "ExpoImage",
       "ancestors": ["ExpoImage", "Pressable", "ProfilePage", "SceneView"],
       "props": {
-        "source": "[{\"uri\":\"https://d3s62njta9pw6e.cloudfront.net/ira_with_computer_compressed.jpg\""
+        "source": "[{\"uri\":\"https://d3s62njta9pw6e.cloudfront.net/chat_avatar.jpg\""
       }
     },
     {
@@ -150,7 +150,7 @@
       "component": "ScreenStackHeaderConfig",
       "ancestors": ["ScreenStackHeaderConfig", "SceneView", "NativeStackNavigator", "Dashboard"],
       "props": {
-        "title": "Ira",
+        "title": "Chat",
         "color": "rgb(28, 28, 30)"
       }
     },

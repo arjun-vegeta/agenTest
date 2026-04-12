@@ -855,8 +855,8 @@ function walkAndHoist(
  * Maximum length for a content-desc to be treated as the node's own label.
  * Descriptions longer than this are almost always **aggregated a11y labels**
  * — the Android TalkBack-style concatenation of all descendant text nodes
- * (e.g. the Ira app's outer clickable wrapper with a 120-char desc that's
- * just "meet ira, the friend who is always present, good conversations, …").
+ * (e.g. the chat app's outer clickable wrapper with a 120-char desc that's
+ * just "long descriptive content-desc, …").
  * Such strings are not user-facing button names; emitting them on a ref
  * line wastes tokens and — because they become the "own label" — prevents
  * transparent-collapse and duplicate-suppression. Dropping them lets the
@@ -890,7 +890,7 @@ function findFirstLabelInSubtree(node: UnifiedUINode): string {
   // descendants deserve their own refs — stealing their labels would both
   // (a) hide them from the LLM (the duplicate-skip logic in walkCompact
   // would eat them), and (b) wrongly label the parent with content from
-  // something the user would tap separately. For the Ira "phone row"
+  // something the user would tap separately. For the chat "phone row"
   // pattern (outer TouchableOpacity > inner TouchableOpacity > +91 tap +
   // EditText) this is what prevents the wrapper hell where three nested
   // @b refs all inherit "enter number here" from the EditText.
@@ -1160,7 +1160,7 @@ function walkCompact(
 
   if (interactive) {
     // Transparent collapse for unlabeled clickable containers that wrap
-    // other interactives — the Ira "phone row" case: outer TouchableOpacity
+    // other interactives — the chat "phone row" case: outer TouchableOpacity
     // > inner TouchableOpacity > (+91 tap + EditText). Without this
     // collapse, the LLM sees @g1 > @g2 > (@b1 + @f1) — three nested
     // wrappers that add no addressable value because the LLM targets the
@@ -1201,7 +1201,7 @@ function walkCompact(
 
     // This interactive starts a fresh suppression scope: if it emitted
     // any label at all (own or hoisted), suppress any plain-text leaves
-    // in this subtree whose text exactly matches. The live Ira app has
+    // in this subtree whose text exactly matches. The live chat app has
     // buttons with BOTH `desc="sign up"` AND a child TextView with
     // `text="sign up"` — without this we'd emit:
     //     @b3 btn "sign up" disabled
