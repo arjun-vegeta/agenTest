@@ -1,12 +1,34 @@
 {
   "name": "agentest",
   "version": "0.1.0",
-  "description": "AI-driven mobile app testing via MCP — reads accessibility trees, injects input via ADB",
+  "description": "AI-driven mobile app testing via MCP — any AI agent can test any Android app",
   "type": "module",
   "main": "dist/server.js",
   "bin": {
     "agentest": "dist/server.js"
   },
+  "keywords": [
+    "mcp",
+    "testing",
+    "android",
+    "mobile",
+    "ai",
+    "automation",
+    "accessibility",
+    "adb",
+    "emulator",
+    "react-native",
+    "flutter"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AgenTest-AI/agentest.git"
+  },
+  "homepage": "https://github.com/AgenTest-AI/agentest",
+  "bugs": {
+    "url": "https://github.com/AgenTest-AI/agentest/issues"
+  },
+  "author": "AgenTest",
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
