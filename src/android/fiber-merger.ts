@@ -631,22 +631,3 @@ function calibrateOffset(
   };
 }
 
-function findNodesByBounds(
-  nodes: UnifiedUINode[],
-  target: PhysicalBounds,
-): UnifiedUINode[] {
-  const matches: UnifiedUINode[] = [];
-  for (const n of nodes) {
-    if (boundsMatch(n.bounds, target)) matches.push(n);
-  }
-  return matches;
-}
-
-function boundsMatch(a: UnifiedUINode['bounds'], b: PhysicalBounds): boolean {
-  return (
-    Math.abs(a.left - b.left) <= BOUNDS_JITTER_PX &&
-    Math.abs(a.top - b.top) <= BOUNDS_JITTER_PX &&
-    Math.abs(a.right - b.right) <= BOUNDS_JITTER_PX &&
-    Math.abs(a.bottom - b.bottom) <= BOUNDS_JITTER_PX
-  );
-}
