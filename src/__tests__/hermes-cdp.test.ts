@@ -191,7 +191,7 @@ describe('discoverHermesTargets', () => {
  * Build a stub `HermesCdpClient` whose `evaluate` returns after a
  * configurable delay. We stub at the method level and skip the real
  * WebSocket path — that's exercised via the integration tests behind
- * `LAZYTEST_DISABLE_FRAMEWORK_SYNC`.
+ * `AGENTEST_DISABLE_FRAMEWORK_SYNC`.
  */
 function makeStubHermesClient(evaluateDelayMs: () => number): HermesCdpClient {
   const stub = Object.create(HermesCdpClient.prototype) as HermesCdpClient;

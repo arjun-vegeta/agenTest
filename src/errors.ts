@@ -1,21 +1,21 @@
-export class LazyTestError extends Error {
+export class AgenTestError extends Error {
   constructor(
     message: string,
     public readonly code: string,
   ) {
     super(message);
-    this.name = 'LazyTestError';
+    this.name = 'AgenTestError';
   }
 }
 
-export class AdbConnectionError extends LazyTestError {
+export class AdbConnectionError extends AgenTestError {
   constructor(message: string) {
     super(message, 'ADB_CONNECTION_ERROR');
     this.name = 'AdbConnectionError';
   }
 }
 
-export class AdbCommandError extends LazyTestError {
+export class AdbCommandError extends AgenTestError {
   constructor(
     message: string,
     public readonly command: string,
@@ -25,7 +25,7 @@ export class AdbCommandError extends LazyTestError {
   }
 }
 
-export class ElementNotFoundError extends LazyTestError {
+export class ElementNotFoundError extends AgenTestError {
   constructor(
     message: string,
     public readonly selector: Record<string, unknown>,
@@ -35,14 +35,14 @@ export class ElementNotFoundError extends LazyTestError {
   }
 }
 
-export class IdleTimeoutError extends LazyTestError {
+export class IdleTimeoutError extends AgenTestError {
   constructor(timeoutMs: number) {
     super(`UI did not stabilize within ${timeoutMs}ms`, 'IDLE_TIMEOUT');
     this.name = 'IdleTimeoutError';
   }
 }
 
-export class AssertionFailedError extends LazyTestError {
+export class AssertionFailedError extends AgenTestError {
   constructor(
     message: string,
     public readonly expected: string,
@@ -53,28 +53,28 @@ export class AssertionFailedError extends LazyTestError {
   }
 }
 
-export class AppNotInstalledError extends LazyTestError {
+export class AppNotInstalledError extends AgenTestError {
   constructor(packageName: string) {
     super(`App "${packageName}" is not installed on the device`, 'APP_NOT_INSTALLED');
     this.name = 'AppNotInstalledError';
   }
 }
 
-export class TreeParseError extends LazyTestError {
+export class TreeParseError extends AgenTestError {
   constructor(message: string) {
     super(message, 'TREE_PARSE_ERROR');
     this.name = 'TreeParseError';
   }
 }
 
-export class GrpcConnectionError extends LazyTestError {
+export class GrpcConnectionError extends AgenTestError {
   constructor(message: string) {
     super(message, 'GRPC_CONNECTION_ERROR');
     this.name = 'GrpcConnectionError';
   }
 }
 
-export class GrpcRpcError extends LazyTestError {
+export class GrpcRpcError extends AgenTestError {
   constructor(
     message: string,
     public readonly rpcMethod: string,

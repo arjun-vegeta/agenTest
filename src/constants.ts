@@ -3,17 +3,17 @@
 // ---------------------------------------------------------------------------
 
 export const TOOL_NAMES = {
-  CONNECT: 'lazytest_connect',
-  GET_UI_TREE: 'lazytest_get_ui_tree',
-  RUN_FLOW: 'lazytest_run_flow',
-  RESET_APP: 'lazytest_reset_app',
+  CONNECT: 'agentest_connect',
+  GET_UI_TREE: 'agentest_get_ui_tree',
+  RUN_FLOW: 'agentest_run_flow',
+  RESET_APP: 'agentest_reset_app',
 } as const;
 
 // ---------------------------------------------------------------------------
 // MCP Server Identity
 // ---------------------------------------------------------------------------
 
-export const SERVER_NAME = 'lazytest';
+export const SERVER_NAME = 'agentest';
 export const SERVER_VERSION = '0.1.0';
 
 // ---------------------------------------------------------------------------
@@ -197,12 +197,12 @@ export const RETRY = {
 // ---------------------------------------------------------------------------
 
 export const TOOL_NAMES_EXT = {
-  GET_LOGS: 'lazytest_get_logs',
-  SCREENSHOT: 'lazytest_screenshot',
-  DEVICE_INFO: 'lazytest_device_info',
-  GET_SHARED_PREFS: 'lazytest_get_shared_prefs',
-  QUERY_DB: 'lazytest_query_db',
-  SET_NETWORK: 'lazytest_set_network',
+  GET_LOGS: 'agentest_get_logs',
+  SCREENSHOT: 'agentest_screenshot',
+  DEVICE_INFO: 'agentest_device_info',
+  GET_SHARED_PREFS: 'agentest_get_shared_prefs',
+  QUERY_DB: 'agentest_query_db',
+  SET_NETWORK: 'agentest_set_network',
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -379,16 +379,16 @@ export const GRPC = {
 // ---------------------------------------------------------------------------
 
 /**
- * Constants for the LazyTest on-device helper. The helper APK runs inside an
+ * Constants for the AgenTest on-device helper. The helper APK runs inside an
  * `am instrument` process on the device and exposes UiAutomation primitives
  * over a localhost HTTP server. The host TypeScript MCP server reaches it via
  * `adb forward`. See android-helper/ for the source.
  */
 export const HELPER = {
   /** Main APK package name. */
-  PACKAGE: 'com.lazytest.helper',
+  PACKAGE: 'com.agentest.helper',
   /** Test APK package name (the one `am instrument` targets). */
-  TEST_PACKAGE: 'com.lazytest.helper.test',
+  TEST_PACKAGE: 'com.agentest.helper.test',
   /** AndroidJUnitRunner full class — what `am instrument` invokes. */
   RUNNER: 'androidx.test.runner.AndroidJUnitRunner',
   /** Port the helper binds to inside the device. */
@@ -399,8 +399,8 @@ export const HELPER = {
    */
   HOST_PORT: 8765,
   /** Filenames in android-helper/prebuilt/ shipped with the npm package. */
-  MAIN_APK_FILENAME: 'lazytest-helper.apk',
-  TEST_APK_FILENAME: 'lazytest-helper-test.apk',
+  MAIN_APK_FILENAME: 'agentest-helper.apk',
+  TEST_APK_FILENAME: 'agentest-helper-test.apk',
   /**
    * Minimum versionCode the helper APK must have for the host to accept it.
    * Bump in lockstep with android-helper/app/build.gradle.kts versionCode.
@@ -509,7 +509,7 @@ export const FLUTTER_VM = {
 } as const;
 
 /**
- * LazyTest IdlingResource bridge (Phase 3.10). Opt-in AAR users add to their
+ * AgenTest IdlingResource bridge (Phase 3.10). Opt-in AAR users add to their
  * app's `debugImplementation`. Exposes a ContentProvider that the helper can
  * query for pending-idle-resource counts.
  *
@@ -517,22 +517,22 @@ export const FLUTTER_VM = {
  */
 export const IDLING_BRIDGE = {
   /** Suffix appended to the app's package to form the provider authority. */
-  AUTHORITY_SUFFIX: '.lazytest.idling',
+  AUTHORITY_SUFFIX: '.agentest.idling',
   /** Content URI path for the idle-state query. */
   QUERY_PATH: 'state',
   /** Max time allowed for an idling-state query (ms). */
   QUERY_TIMEOUT_MS: 2_000,
   /**
    * Wire format version of the idling bridge ContentProvider. Must match
-   * `LazyTestIdlingProvider.WIRE_VERSION` in the Kotlin AAR. Bump together
+   * `AgenTestIdlingProvider.WIRE_VERSION` in the Kotlin AAR. Bump together
    * when the cursor schema changes.
    *
-   * The host uses this to detect when a user has updated LazyTest via npm
+   * The host uses this to detect when a user has updated AgenTest via npm
    * but their Android app still has the old AAR baked into its debug build
    * — Gradle caches AARs in the app's build cache, so a stale version can
-   * persist across `npm update lazytest` until the user rebuilds their app.
+   * persist across `npm update agentest` until the user rebuilds their app.
    *
-   * On mismatch, `lazytest_connect` returns a warning with an actionable
+   * On mismatch, `agentest_connect` returns a warning with an actionable
    * `./gradlew` rebuild command that the LLM surfaces to the developer.
    */
   EXPECTED_WIRE_VERSION: 1,

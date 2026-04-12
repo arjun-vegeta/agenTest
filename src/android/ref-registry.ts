@@ -8,7 +8,7 @@
  *   - Created once per MCP session (in server.ts alongside activeDeviceId).
  *   - `rebuild(tree)` is called every time the tree is snapshotted.
  *   - `resolve(ref)` is called by `resolveTarget` when a selector has `ref`.
- *   - `clear()` is called on `lazytest_connect` to drop stale refs from a
+ *   - `clear()` is called on `agentest_connect` to drop stale refs from a
  *     previous app session.
  */
 import { ElementNotFoundError } from '../errors.js';
@@ -46,7 +46,7 @@ export class RefRegistry {
   /**
    * Look up a ref token. Throws `ElementNotFoundError` with an actionable
    * stale-ref message if the ref doesn't exist — tells the LLM to call
-   * `lazytest_get_ui_tree` for fresh refs instead of retrying blindly.
+   * `agentest_get_ui_tree` for fresh refs instead of retrying blindly.
    *
    * Per concern #5: if ref is set, ref wins. No auto-fallback to other
    * selector fields. The LLM must re-snapshot to recover.
@@ -56,7 +56,7 @@ export class RefRegistry {
     if (!node) {
       throw new ElementNotFoundError(
         `ref "${ref}" is stale — the screen changed since the last snapshot. ` +
-          'Call lazytest_get_ui_tree for fresh refs.',
+          'Call agentest_get_ui_tree for fresh refs.',
         { ref },
       );
     }
@@ -78,7 +78,7 @@ export class RefRegistry {
     return this.refMap.size;
   }
 
-  /** Drop all refs and cached state. Called on `lazytest_connect`. */
+  /** Drop all refs and cached state. Called on `agentest_connect`. */
   clear(): void {
     this.refMap.clear();
     this.lastResult = null;

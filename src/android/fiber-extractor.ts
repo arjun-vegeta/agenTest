@@ -2,7 +2,7 @@
  * React Fiber tree extraction from a running React Native app via Hermes
  * CDP Runtime.evaluate. Phase 3.6.
  *
- * This is how LazyTest identifies unlabeled icon buttons in Bolt/v0/Lovable
+ * This is how AgenTest identifies unlabeled icon buttons in Bolt/v0/Lovable
  * codegen apps: walk the React Fiber tree exposed via
  * `__REACT_DEVTOOLS_GLOBAL_HOOK__` and extract each host component's nearest
  * meaningful React ancestor (`ArrowLeft`, `Settings`, `Camera`, `SendIcon`
@@ -15,10 +15,10 @@
  *      that walks the fiber tree synchronously, returns {tag, host,
  *      component, ancestors, props} for every HostComponent fiber, and
  *      ALSO kicks off `stateNode.measureInWindow` callbacks in the
- *      background that stash results in `globalThis.__lazytest_measures`.
+ *      background that stash results in `globalThis.__agentest_measures`.
  *   2. Host waits ~150ms for those callbacks to fire on the UI thread.
  *   3. `fetchFiberMeasurements(client)` — a second synchronous call
- *      reads `globalThis.__lazytest_measures` and returns the populated
+ *      reads `globalThis.__agentest_measures` and returns the populated
  *      map. Also clears it for the next call.
  *
  * Why the two-call pattern: Hermes's CDP `awaitPromise: true` flag is
@@ -31,7 +31,7 @@
  *
  * Debug-build only — Hermes inspector is disabled in release. The
  * caller must already have an attached `HermesCdpClient` (i.e. Hermes
- * was discovered during `lazytest_connect` and framework-sync is active).
+ * was discovered during `agentest_connect` and framework-sync is active).
  */
 
 import type { HermesCdpClient } from './hermes-cdp.js';
@@ -89,7 +89,7 @@ interface FiberMeasurementsResult {
  * Fiber walker — runs inside Hermes's JS runtime. Sync only: walks the
  * tree via `__REACT_DEVTOOLS_GLOBAL_HOOK__.getFiberRoots`, collects host
  * fibers, and for each calls `stateNode.measureInWindow(cb)` to stash
- * async bounds into `globalThis.__lazytest_measures` keyed by tag. The
+ * async bounds into `globalThis.__agentest_measures` keyed by tag. The
  * return value is the synchronous list of {tag, host, component,
  * ancestors, props} — bounds come from the second call.
  *
@@ -107,7 +107,7 @@ const FIBER_WALKER_EXPR = `(function () {
 
     // Reset the measurements bag for this walk. Keep it on globalThis
     // so the second CDP call can read it without another handshake.
-    globalThis.__lazytest_measures = {};
+    globalThis.__agentest_measures = {};
 
     var PROP_KEYS = ['icon','name','accessibilityLabel','testID','title','label','source','alt','contentDescription'];
     // Generic component names to skip when walking up the React tree
@@ -194,7 +194,7 @@ const FIBER_WALKER_EXPR = `(function () {
         var fn = (stateNode.canonical && stateNode.canonical.measureInWindow) || stateNode.measureInWindow;
         if (typeof fn !== 'function') return;
         fn.call(stateNode.canonical || stateNode, function (x, y, w, h) {
-          globalThis.__lazytest_measures[String(tag)] = { x: x, y: y, width: w, height: h };
+          globalThis.__agentest_measures[String(tag)] = { x: x, y: y, width: w, height: h };
         });
       } catch (e) { /* ignore */ }
     }
@@ -241,8 +241,8 @@ const FIBER_WALKER_EXPR = `(function () {
  */
 const MEASUREMENTS_READER_EXPR = `(function () {
   try {
-    var m = globalThis.__lazytest_measures || {};
-    globalThis.__lazytest_measures = {};
+    var m = globalThis.__agentest_measures || {};
+    globalThis.__agentest_measures = {};
     return { ok: true, measures: m };
   } catch (err) {
     return { ok: false };
@@ -275,7 +275,7 @@ export async function extractReactFiberTree(
     raw = await client.evaluate(FIBER_WALKER_EXPR);
   } catch (err) {
     console.error(
-      `[lazytest fiber] walker evaluate threw: ${err instanceof Error ? err.message : String(err)}`,
+      `[agentest fiber] walker evaluate threw: ${err instanceof Error ? err.message : String(err)}`,
     );
     return null;
   }
@@ -286,7 +286,7 @@ export async function extractReactFiberTree(
   const result = raw as FiberWalkerResult;
   if (!result.ok || !Array.isArray(result.nodes)) {
     if (result.reason) {
-      console.error(`[lazytest fiber] walker returned ok:false reason=${result.reason}`);
+      console.error(`[agentest fiber] walker returned ok:false reason=${result.reason}`);
     }
     return null;
   }

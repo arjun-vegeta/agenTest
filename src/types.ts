@@ -129,7 +129,7 @@ export const ElementSelectorSchema = z
       .string()
       .optional()
       .describe(
-        'Short ref token from the last tree snapshot (e.g. "@b1"). When set, ref takes priority over all other fields — they are ignored. If the ref is stale (screen changed), you\'ll get a clear error telling you to call lazytest_get_ui_tree for fresh refs.',
+        'Short ref token from the last tree snapshot (e.g. "@b1"). When set, ref takes priority over all other fields — they are ignored. If the ref is stale (screen changed), you\'ll get a clear error telling you to call agentest_get_ui_tree for fresh refs.',
       ),
     id: z
       .string()
@@ -364,7 +364,7 @@ export interface FlowTrace {
   results: StepResult[];
   /**
    * 6-char screen fingerprint. Always present. Compare with the fingerprint
-   * from the `lazytest_connect` / `lazytest_get_ui_tree` call to know if the
+   * from the `agentest_connect` / `agentest_get_ui_tree` call to know if the
    * screen changed during the flow.
    */
   screenFingerprint: string;

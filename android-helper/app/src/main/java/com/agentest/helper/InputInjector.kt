@@ -1,4 +1,4 @@
-package com.lazytest.helper
+package com.agentest.helper
 
 import android.app.UiAutomation
 import android.os.SystemClock

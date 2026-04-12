@@ -1,4 +1,4 @@
-package com.lazytest.helper
+package com.agentest.helper
 
 import android.app.Instrumentation
 import android.app.UiAutomation
@@ -80,7 +80,7 @@ class HelperServer private constructor(
     private fun handleStatus(): Response {
         val body = JSONObject().apply {
             put("ok", true)
-            put("name", "lazytest-helper")
+            put("name", "agentest-helper")
             put("version", VERSION)
             put("protocolVersion", PROTOCOL_VERSION)
             put("sdkInt", Build.VERSION.SDK_INT)
@@ -224,7 +224,7 @@ class HelperServer private constructor(
     }
 
     companion object {
-        private const val TAG = "LazyTestHelper"
+        private const val TAG = "AgenTestHelper"
         const val VERSION = "1.0.0"
 
         // Bumped whenever the wire protocol changes incompatibly. The host
@@ -255,7 +255,7 @@ class HelperServer private constructor(
             val server = HelperServer(instrumentation, uiAutomation, DEFAULT_PORT)
             server.start(SOCKET_READ_TIMEOUT_MS, false)
             instance = server
-            Log.i(TAG, "LazyTest helper started on port $DEFAULT_PORT (v$VERSION)")
+            Log.i(TAG, "AgenTest helper started on port $DEFAULT_PORT (v$VERSION)")
             return server
         }
 

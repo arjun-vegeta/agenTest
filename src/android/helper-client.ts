@@ -1,5 +1,5 @@
 /**
- * HTTP client for the on-device LazyTest helper APK.
+ * HTTP client for the on-device AgenTest helper APK.
  *
  * The helper exposes UiAutomation primitives over a localhost HTTP server.
  * Reaches it via `adb forward` — the host port is mapped to the device port,
@@ -97,7 +97,7 @@ export class HelperClient {
       await sleep(HELPER.STARTUP_POLL_MS);
     }
     throw new AdbCommandError(
-      `LazyTest helper did not come up within ${timeoutMs}ms${lastError ? ': ' + lastError.message : ''}`,
+      `AgenTest helper did not come up within ${timeoutMs}ms${lastError ? ': ' + lastError.message : ''}`,
       'helper /status',
     );
   }

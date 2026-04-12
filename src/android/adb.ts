@@ -554,23 +554,23 @@ export class AdbClient {
   }
 
   // -----------------------------------------------------------------------
-  // LazyTest Idling Bridge (Phase 3.10)
+  // AgenTest Idling Bridge (Phase 3.10)
   // -----------------------------------------------------------------------
 
   /**
-   * Query the opt-in LazyTest idling bridge ContentProvider (if the user's
-   * app includes the `lazytest-idling-bridge` AAR). Returns `null` when the
+   * Query the opt-in AgenTest idling bridge ContentProvider (if the user's
+   * app includes the `agentest-idling-bridge` AAR). Returns `null` when the
    * provider is absent, unresolvable, or `content query` failed — callers
    * treat null as "no idle bridge attached, skip this sync channel".
    *
-   * Wire format (from `LazyTestIdlingProvider`):
+   * Wire format (from `AgenTestIdlingProvider`):
    *   `Row: 0 idle_count=<N>, idle_names=<csv>, version=<N>`
    *
    * The `content query` CLI is available since API 21. Output is a series
    * of `Row: <N> col=val, col=val, ...` lines. We parse the first row only.
    *
    * The returned `version` comes straight from the bridge's cursor so
-   * callers can detect stale AARs (user updated LazyTest via npm but hasn't
+   * callers can detect stale AARs (user updated AgenTest via npm but hasn't
    * rebuilt their app to pick up the new AAR from node_modules).
    */
   async queryIdlingBridge(

@@ -1,7 +1,7 @@
-# LazyTest Helper APK
+# AgenTest Helper APK
 
-The on-device helper for LazyTest. Two APKs that get installed via `adb` on
-the first MCP `lazytest_connect` call. The helper exposes UiAutomation
+The on-device helper for AgenTest. Two APKs that get installed via `adb` on
+the first MCP `agentest_connect` call. The helper exposes UiAutomation
 primitives over a localhost HTTP server so the host TypeScript MCP server
 can read trees, inject input, and detect idle without paying the per-call
 process-spawn cost of `adb shell ...`.
@@ -10,10 +10,10 @@ process-spawn cost of `adb shell ...`.
 
 Two APKs because Android instrumentation requires it:
 
-- **`com.lazytest.helper`** — main APK. Contains the embedded NanoHTTPD server
+- **`com.agentest.helper`** — main APK. Contains the embedded NanoHTTPD server
   and all UiAutomation logic. No launcher activity, no service. Exists purely
   as the target package for the test APK's `<instrumentation>` tag.
-- **`com.lazytest.helper.test`** — test APK. Contains a single JUnit `@Test`
+- **`com.agentest.helper.test`** — test APK. Contains a single JUnit `@Test`
   method (`HelperEntryPoint.startHelperServer`) that launches the embedded
   server and blocks on a `CountDownLatch` until shutdown. Pattern stolen
   from `appium/appium-uiautomator2-server`.
@@ -21,11 +21,11 @@ Two APKs because Android instrumentation requires it:
 The host runs:
 
 ```
-adb install -r -t lazytest-helper.apk
-adb install -r -t lazytest-helper-test.apk
+adb install -r -t agentest-helper.apk
+adb install -r -t agentest-helper-test.apk
 adb forward tcp:8765 tcp:8765
 adb shell am instrument -w -r \
-    com.lazytest.helper.test/androidx.test.runner.AndroidJUnitRunner
+    com.agentest.helper.test/androidx.test.runner.AndroidJUnitRunner
 ```
 
 `am instrument` runs the test process under the **shell UID**, which holds
@@ -71,9 +71,9 @@ echo "sdk.dir=$ANDROID_HOME" > local.properties
 
 # Copy the freshly built APKs into prebuilt/ so the npm package picks them up.
 cp app/build/outputs/apk/debug/app-debug.apk \
-   prebuilt/lazytest-helper.apk
+   prebuilt/agentest-helper.apk
 cp app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk \
-   prebuilt/lazytest-helper-test.apk
+   prebuilt/agentest-helper-test.apk
 ```
 
 After committing the new APKs, bump:
@@ -100,7 +100,7 @@ We considered it. Reasons we wrote our own minimal version:
    streamer, no Bluetooth permissions, no AsyncTask).
 2. **Protocol**: Appium speaks W3C WebDriver. We just need a few JSON
    endpoints — no need to parse selector strings, capability bags, etc.
-3. **Endpoint design**: ours is shaped to match LazyTest's existing
+3. **Endpoint design**: ours is shaped to match AgenTest's existing
    `DeviceClient` API exactly, no impedance mismatch.
 4. **Push idle detection**: Appium polls; we use
    `OnAccessibilityEventListener` for sub-frame idle signals.

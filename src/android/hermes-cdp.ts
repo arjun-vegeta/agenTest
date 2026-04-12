@@ -5,7 +5,7 @@
  * speaks a tiny subset of the Chrome DevTools Protocol (CDP) sufficient for
  * evaluating JavaScript expressions in the running Hermes instance.
  *
- * LazyTest uses this to detect when React Native has finished processing its
+ * AgenTest uses this to detect when React Native has finished processing its
  * JS event loop — pending microtasks, setTimeout queue, Promise chains — so
  * the flow runner doesn't fire the next action while React is still committing
  * state updates.
@@ -237,7 +237,7 @@ export class HermesCdpClient {
     if (!this.runtimeEnabled) {
       throw new Error('Hermes CDP: Runtime.enable has not been called');
     }
-    const wrapped = `(function(){try{return ${expression};}catch(e){return {__lazytest_error:String(e)};}})()`;
+    const wrapped = `(function(){try{return ${expression};}catch(e){return {__agentest_error:String(e)};}})()`;
     const result = (await this.call('Runtime.evaluate', {
       expression: wrapped,
       returnByValue: true,

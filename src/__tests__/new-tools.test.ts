@@ -10,7 +10,7 @@ import { handleSetNetwork } from '../tools/set-network.js';
 import { MockShellExecutor } from './mock-shell.js';
 
 // ---------------------------------------------------------------------------
-// lazytest_get_logs
+// agentest_get_logs
 // ---------------------------------------------------------------------------
 
 describe('handleGetLogs', () => {
@@ -64,7 +64,7 @@ describe('handleGetLogs', () => {
 });
 
 // ---------------------------------------------------------------------------
-// lazytest_screenshot
+// agentest_screenshot
 // ---------------------------------------------------------------------------
 
 describe('handleScreenshot', () => {
@@ -84,7 +84,7 @@ describe('handleScreenshot', () => {
 });
 
 // ---------------------------------------------------------------------------
-// lazytest_device_info
+// agentest_device_info
 // ---------------------------------------------------------------------------
 
 describe('handleDeviceInfo', () => {
@@ -357,7 +357,7 @@ describe('ADB system dialog detection', () => {
 });
 
 // ---------------------------------------------------------------------------
-// lazytest_get_shared_prefs
+// agentest_get_shared_prefs
 // ---------------------------------------------------------------------------
 
 describe('handleGetSharedPrefs', () => {
@@ -407,7 +407,7 @@ describe('handleGetSharedPrefs', () => {
 });
 
 // ---------------------------------------------------------------------------
-// lazytest_query_db
+// agentest_query_db
 // ---------------------------------------------------------------------------
 
 describe('handleQueryDb', () => {
@@ -449,7 +449,7 @@ describe('handleQueryDb', () => {
 });
 
 // ---------------------------------------------------------------------------
-// lazytest_set_network
+// agentest_set_network
 // ---------------------------------------------------------------------------
 
 describe('handleSetNetwork', () => {

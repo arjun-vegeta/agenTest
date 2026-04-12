@@ -1,7 +1,7 @@
 /**
  * Tests for ensureHelper — the auto-install + launch flow that runs on first
  * MCP connect. Uses MockShellExecutor for ADB calls and overrides
- * LAZYTEST_HELPER_APK_DIR to point at a temp directory containing dummy APKs
+ * AGENTEST_HELPER_APK_DIR to point at a temp directory containing dummy APKs
  * so findPrebuiltApks succeeds.
  */
 
@@ -19,32 +19,32 @@ describe('ensureHelper', () => {
   let tempDir: string;
 
   beforeEach(() => {
-    originalEnv = process.env['LAZYTEST_HELPER_APK_DIR'];
-    originalDisable = process.env['LAZYTEST_DISABLE_HELPER'];
+    originalEnv = process.env['AGENTEST_HELPER_APK_DIR'];
+    originalDisable = process.env['AGENTEST_DISABLE_HELPER'];
     // The vitest config sets this; we need to clear it for these tests so
     // ensureHelper actually runs through the install flow.
-    delete process.env['LAZYTEST_DISABLE_HELPER'];
+    delete process.env['AGENTEST_DISABLE_HELPER'];
 
     // Create a temp dir with dummy APK files so findPrebuiltApks succeeds.
-    tempDir = mkdtempSync(join(tmpdir(), 'lazytest-helper-test-'));
+    tempDir = mkdtempSync(join(tmpdir(), 'agentest-helper-test-'));
     writeFileSync(join(tempDir, HELPER.MAIN_APK_FILENAME), 'dummy main apk');
     writeFileSync(join(tempDir, HELPER.TEST_APK_FILENAME), 'dummy test apk');
-    process.env['LAZYTEST_HELPER_APK_DIR'] = tempDir;
+    process.env['AGENTEST_HELPER_APK_DIR'] = tempDir;
   });
 
   afterEach(() => {
     if (originalEnv === undefined) {
-      delete process.env['LAZYTEST_HELPER_APK_DIR'];
+      delete process.env['AGENTEST_HELPER_APK_DIR'];
     } else {
-      process.env['LAZYTEST_HELPER_APK_DIR'] = originalEnv;
+      process.env['AGENTEST_HELPER_APK_DIR'] = originalEnv;
     }
     if (originalDisable !== undefined) {
-      process.env['LAZYTEST_DISABLE_HELPER'] = originalDisable;
+      process.env['AGENTEST_DISABLE_HELPER'] = originalDisable;
     }
   });
 
-  it('returns null immediately when LAZYTEST_DISABLE_HELPER=1', async () => {
-    process.env['LAZYTEST_DISABLE_HELPER'] = '1';
+  it('returns null immediately when AGENTEST_DISABLE_HELPER=1', async () => {
+    process.env['AGENTEST_DISABLE_HELPER'] = '1';
     const shell = new MockShellExecutor();
     const handle = await ensureHelper(shell, 'emulator-5554');
     expect(handle).toBeNull();
@@ -53,8 +53,8 @@ describe('ensureHelper', () => {
   });
 
   it('returns null when prebuilt APKs are missing', async () => {
-    delete process.env['LAZYTEST_HELPER_APK_DIR'];
-    process.env['LAZYTEST_HELPER_APK_DIR'] = '/nonexistent/path';
+    delete process.env['AGENTEST_HELPER_APK_DIR'];
+    process.env['AGENTEST_HELPER_APK_DIR'] = '/nonexistent/path';
     const shell = new MockShellExecutor();
     const handle = await ensureHelper(shell, 'emulator-5554');
     expect(handle).toBeNull();
@@ -66,8 +66,8 @@ describe('ensureHelper', () => {
     // PATH in CI). The function should return null on spawn failure, not
     // throw.
     const shell = new MockShellExecutor()
-      .when('pm list packages com.lazytest.helper.test', '')
-      .when(/pm list packages com\.lazytest\.helper(?!\.test)/, '')
+      .when('pm list packages com.agentest.helper.test', '')
+      .when(/pm list packages com\.agentest\.helper(?!\.test)/, '')
       .when('install -r -t', 'Success')
       .when('forward tcp:', '')
       .when('forward --remove', '');
@@ -94,9 +94,9 @@ describe('ensureHelper', () => {
   it('skips reinstall when correct version already installed', async () => {
     const shell = new MockShellExecutor()
       // Both packages installed
-      .when('pm list packages com.lazytest.helper.test', 'package:com.lazytest.helper.test')
-      .when(/pm list packages com\.lazytest\.helper(?!\.test)/, 'package:com.lazytest.helper')
-      .when('dumpsys package com.lazytest.helper', `versionCode=${HELPER.MIN_VERSION_CODE} ...`)
+      .when('pm list packages com.agentest.helper.test', 'package:com.agentest.helper.test')
+      .when(/pm list packages com\.agentest\.helper(?!\.test)/, 'package:com.agentest.helper')
+      .when('dumpsys package com.agentest.helper', `versionCode=${HELPER.MIN_VERSION_CODE} ...`)
       .when('forward tcp:', '')
       .when('forward --remove', '');
 
@@ -116,9 +116,9 @@ describe('ensureHelper', () => {
 
   it('reinstalls when device version is older', async () => {
     const shell = new MockShellExecutor()
-      .when('pm list packages com.lazytest.helper.test', 'package:com.lazytest.helper.test')
-      .when(/pm list packages com\.lazytest\.helper(?!\.test)/, 'package:com.lazytest.helper')
-      .when('dumpsys package com.lazytest.helper', 'versionCode=0 minSdk=24')
+      .when('pm list packages com.agentest.helper.test', 'package:com.agentest.helper.test')
+      .when(/pm list packages com\.agentest\.helper(?!\.test)/, 'package:com.agentest.helper')
+      .when('dumpsys package com.agentest.helper', 'versionCode=0 minSdk=24')
       .when('uninstall ', 'Success')
       .when('install -r -t', 'Success')
       .when('forward tcp:', '')

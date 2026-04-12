@@ -908,7 +908,7 @@ function findFirstLabelInSubtree(node: UnifiedUINode): string {
 }
 
 /**
- * A node is "interactive" if it can receive any LazyTest action: tap, type,
+ * A node is "interactive" if it can receive any AgenTest action: tap, type,
  * scroll, check, or long-press. This is the gate for whether the node gets
  * a ref token in the compact format.
  */

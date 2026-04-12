@@ -4,21 +4,21 @@ plugins {
 }
 
 // ---------------------------------------------------------------------------
-// LazyTest Idling Bridge
+// AgenTest Idling Bridge
 //
 // Opt-in library (Phase 3.10) that app authors add to their debug builds so
-// the LazyTest helper can query app-side idle state from outside the app
+// the AgenTest helper can query app-side idle state from outside the app
 // process. Without this library, the helper relies purely on accessibility
 // events; with it, the helper can also ask "does the app have any pending
 // Espresso IdlingResources / in-flight network requests / pending coroutine
 // dispatches?" before declaring idle.
 //
-// Distribution: users add `debugImplementation files('path/to/lazytest-idling-bridge.aar')`
-// or copy the single Kotlin file (LazyTestIdlingProvider.kt) into their debug
+// Distribution: users add `debugImplementation files('path/to/agentest-idling-bridge.aar')`
+// or copy the single Kotlin file (AgenTestIdlingProvider.kt) into their debug
 // source set. The library is < 5 KB — smaller than the Gradle wrapper itself.
 //
 // Runtime: the library registers a ContentProvider with authority
-// `<app-package>.lazytest.idling` that responds to queries with a single
+// `<app-package>.agentest.idling` that responds to queries with a single
 // row containing `idle_count` (number of not-yet-idle resources) and
 // `idle_names` (comma-separated names).
 //
@@ -29,7 +29,7 @@ plugins {
 // ---------------------------------------------------------------------------
 
 android {
-    namespace = "com.lazytest.bridge"
+    namespace = "com.agentest.bridge"
     compileSdk = 34
 
     defaultConfig {
@@ -51,5 +51,5 @@ dependencies {
     // purely via reflection (`Class.forName("androidx.test.espresso.IdlingRegistry")`)
     // so consumers that use Espresso get auto-bridging without us declaring
     // a dependency, and consumers that don't use Espresso can still register
-    // custom `LazyTestIdlingBridge.IdleSource` implementations.
+    // custom `AgenTestIdlingBridge.IdleSource` implementations.
 }

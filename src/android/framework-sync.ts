@@ -2,7 +2,7 @@
  * Framework sync orchestrator — Phase 3.9.
  *
  * After the on-device helper reports the UI is idle via accessibility events,
- * LazyTest still has a race: the helper only sees Android-side work, not the
+ * AgenTest still has a race: the helper only sees Android-side work, not the
  * JS / Dart work that actually drives the render. This module composes the
  * helper's event-driven idle with framework-specific probes so the flow
  * runner has stronger confidence the app is actually done.
@@ -19,7 +19,7 @@
  *     correctness.
  *
  * Test builds:
- *   - `LAZYTEST_DISABLE_FRAMEWORK_SYNC=1` short-circuits every probe.
+ *   - `AGENTEST_DISABLE_FRAMEWORK_SYNC=1` short-circuits every probe.
  *     Integration tests rely on this so MockShellExecutor doesn't try to
  *     open real WebSockets.
  */
@@ -74,8 +74,8 @@ export class FrameworkSync {
   private attached = false;
 
   /**
-   * LazyTest idling bridge presence (Phase 3.10). Set to true on attach()
-   * if the user's app registered the optional `lazytest-idling-bridge`
+   * AgenTest idling bridge presence (Phase 3.10). Set to true on attach()
+   * if the user's app registered the optional `agentest-idling-bridge`
    * ContentProvider; the sync tail probe then also drains pending Espresso
    * IdlingResources and custom sources.
    */
@@ -84,7 +84,7 @@ export class FrameworkSync {
   /**
    * Wire format version reported by the device-side bridge. Used to detect
    * stale AARs that linger in a user's Android app after they've updated
-   * LazyTest via npm but haven't rebuilt the app.
+   * AgenTest via npm but haven't rebuilt the app.
    */
   private idlingBridgeWireVersion: number | undefined;
 
@@ -93,7 +93,7 @@ export class FrameworkSync {
    * to stderr (helpful for non-Claude-Code MCP clients) AND keep them in
    * memory so the connect tool can surface them in its JSON response.
    *
-   * Why we duplicate: Claude Code's MCP client only forwards lazytest
+   * Why we duplicate: Claude Code's MCP client only forwards agentest
    * stderr at startup; every subsequent console.error during a tool call
    * is dropped on the floor. Without an in-band channel, framework-sync
    * failures are completely opaque to the developer. The connect response
@@ -141,7 +141,7 @@ export class FrameworkSync {
     return this.hermes !== undefined || this.dartVm !== undefined || this.idlingBridgePresent;
   }
 
-  /** True iff the app declared the optional LazyTest idling bridge provider. */
+  /** True iff the app declared the optional AgenTest idling bridge provider. */
   get hasIdlingBridge(): boolean {
     return this.idlingBridgePresent;
   }
@@ -176,7 +176,7 @@ export class FrameworkSync {
   private logDiagnostic(channel: string, message: string): void {
     const line = `[${channel}] ${message}`;
     this.diagnosticLog.push(line);
-    console.error(`[lazytest ${channel}] ${message}`);
+    console.error(`[agentest ${channel}] ${message}`);
   }
 
   /**
@@ -194,9 +194,9 @@ export class FrameworkSync {
     if (this.idlingBridgeWireVersion === expected) return undefined;
     const device = this.idlingBridgeWireVersion;
     return (
-      `LazyTest idling bridge is out of date: the AAR baked into this app ` +
-      `reports wire version ${device}, but LazyTest expects version ${expected}. ` +
-      `This usually means LazyTest was updated via \`npm update lazytest\` but ` +
+      `AgenTest idling bridge is out of date: the AAR baked into this app ` +
+      `reports wire version ${device}, but AgenTest expects version ${expected}. ` +
+      `This usually means AgenTest was updated via \`npm update agentest\` but ` +
       `the Android app hasn't been rebuilt yet — Gradle caches AARs in the app's ` +
       `build cache. Rebuild the app with:\n\n` +
       `    cd android && ./gradlew :app:assembleDebug\n\n` +
@@ -215,8 +215,8 @@ export class FrameworkSync {
     if (this.attached) return;
     this.attached = true;
 
-    if (process.env['LAZYTEST_DISABLE_FRAMEWORK_SYNC'] === '1') {
-      this.logDiagnostic('framework-sync', 'disabled by LAZYTEST_DISABLE_FRAMEWORK_SYNC=1');
+    if (process.env['AGENTEST_DISABLE_FRAMEWORK_SYNC'] === '1') {
+      this.logDiagnostic('framework-sync', 'disabled by AGENTEST_DISABLE_FRAMEWORK_SYNC=1');
       return;
     }
 
@@ -366,8 +366,8 @@ export class FrameworkSync {
    * cache and we re-walk.
    */
   async snapshotFiberLabels(tree: UnifiedUINode): Promise<Map<string, string>> {
-    if (process.env['LAZYTEST_DISABLE_FIBER_INFERENCE'] === '1') {
-      this.logDiagnostic('fiber', 'skipped (LAZYTEST_DISABLE_FIBER_INFERENCE=1)');
+    if (process.env['AGENTEST_DISABLE_FIBER_INFERENCE'] === '1') {
+      this.logDiagnostic('fiber', 'skipped (AGENTEST_DISABLE_FIBER_INFERENCE=1)');
       return new Map();
     }
     if (!this.hermes) {

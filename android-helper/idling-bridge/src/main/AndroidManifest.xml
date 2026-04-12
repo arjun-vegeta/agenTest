@@ -5,18 +5,18 @@
     <!--
         The idling provider is declared here with a package-relative authority
         so apps don't need to edit their own manifest. At runtime the authority
-        becomes `${applicationId}.lazytest.idling`. Gradle's manifest merger
+        becomes `${applicationId}.agentest.idling`. Gradle's manifest merger
         combines this entry with the consuming app's manifest automatically.
 
-        `android:exported="true"` is required so the LazyTest helper process
+        `android:exported="true"` is required so the AgenTest helper process
         (running under shell UID via `am instrument`) can issue queries. This
         is intentional and safe on debug builds — the provider only reveals
         Espresso idle-resource state, never user data.
     -->
     <application>
         <provider
-            android:name="com.lazytest.bridge.LazyTestIdlingProvider"
-            android:authorities="${applicationId}.lazytest.idling"
+            android:name="com.agentest.bridge.AgenTestIdlingProvider"
+            android:authorities="${applicationId}.agentest.idling"
             android:exported="true"
             android:enabled="true"
             tools:ignore="ExportedContentProvider" />

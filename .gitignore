@@ -4,3 +4,9 @@ dist/
 .DS_Store
 *.tsbuildinfo
 coverage/
+
+# Build artifacts
+android-helper/app/build/
+android-helper/idling-bridge/build/
+ios-helper/.build/
+ios-idle-bridge/.build/

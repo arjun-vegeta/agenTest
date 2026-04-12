@@ -114,7 +114,7 @@ export class DeviceClient {
     this.helperHealthy = false;
     const msg = err instanceof Error ? err.message : String(err);
     console.error(
-      `[lazytest] helper ${method} failed, falling back to ADB for the rest of the session: ${msg}`,
+      `[agentest] helper ${method} failed, falling back to ADB for the rest of the session: ${msg}`,
     );
   }
 
@@ -440,6 +440,6 @@ export class DeviceClient {
       throw err;
     }
     this.grpcHealthy = false;
-    console.error(`[lazytest] gRPC ${method} failed, falling back to ADB: ${msg}`);
+    console.error(`[agentest] gRPC ${method} failed, falling back to ADB: ${msg}`);
   }
 }

@@ -3,7 +3,7 @@
  *
  * Covers the pure parsing helpers + the logcat discovery path (using
  * MockShellExecutor). The live WebSocket RPC path is exercised by the
- * framework-sync tests behind LAZYTEST_DISABLE_FRAMEWORK_SYNC, so here
+ * framework-sync tests behind AGENTEST_DISABLE_FRAMEWORK_SYNC, so here
  * we only need offline-friendly tests.
  */
 

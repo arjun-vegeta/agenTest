@@ -1,11 +1,11 @@
 {
-  "name": "lazytest",
+  "name": "agentest",
   "version": "0.1.0",
   "description": "AI-driven mobile app testing via MCP — reads accessibility trees, injects input via ADB",
   "type": "module",
   "main": "dist/server.js",
   "bin": {
-    "lazytest": "dist/server.js"
+    "agentest": "dist/server.js"
   },
   "scripts": {
     "build": "tsc",
@@ -24,9 +24,9 @@
   },
   "files": [
     "dist/**/*",
-    "android-helper/prebuilt/lazytest-helper.apk",
-    "android-helper/prebuilt/lazytest-helper-test.apk",
-    "android-helper/prebuilt/lazytest-idling-bridge.aar"
+    "android-helper/prebuilt/agentest-helper.apk",
+    "android-helper/prebuilt/agentest-helper-test.apk",
+    "android-helper/prebuilt/agentest-idling-bridge.aar"
   ],
   "dependencies": {
     "@grpc/grpc-js": "^1.14.3",

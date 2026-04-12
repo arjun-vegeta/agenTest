@@ -1,5 +1,5 @@
 /**
- * Unit tests for the opt-in LazyTest Idling Bridge (Phase 3.10).
+ * Unit tests for the opt-in AgenTest Idling Bridge (Phase 3.10).
  *
  * Covers AdbClient.queryIdlingBridge parsing and the `FrameworkSync.attach`
  * opt-in detection path. The Kotlin side is tested separately via the
@@ -16,7 +16,7 @@ describe('AdbClient.queryIdlingBridge', () => {
   it('parses a non-idle row from `content query`', async () => {
     const shell = new MockShellExecutor();
     shell.when(
-      'content query --uri content://com.example.app.lazytest.idling/state',
+      'content query --uri content://com.example.app.agentest.idling/state',
       'Row: 0 idle_count=2, idle_names=NetworkIdling,DbIdling, version=1\n',
     );
 
@@ -75,7 +75,7 @@ describe('AdbClient.queryIdlingBridge', () => {
     const adb = new AdbClient(shell);
     await adb.queryIdlingBridge('com.test.foo');
     const calls = shell.getCalls();
-    expect(calls.some((c) => c.includes('content://com.test.foo.lazytest.idling/state'))).toBe(
+    expect(calls.some((c) => c.includes('content://com.test.foo.agentest.idling/state'))).toBe(
       true,
     );
   });
@@ -86,15 +86,15 @@ describe('AdbClient.queryIdlingBridge', () => {
 // ---------------------------------------------------------------------------
 
 describe('FrameworkSync + idling bridge', () => {
-  const prevDisable = process.env['LAZYTEST_DISABLE_FRAMEWORK_SYNC'];
+  const prevDisable = process.env['AGENTEST_DISABLE_FRAMEWORK_SYNC'];
   afterAll(() => {
-    if (prevDisable === undefined) delete process.env['LAZYTEST_DISABLE_FRAMEWORK_SYNC'];
-    else process.env['LAZYTEST_DISABLE_FRAMEWORK_SYNC'] = prevDisable;
+    if (prevDisable === undefined) delete process.env['AGENTEST_DISABLE_FRAMEWORK_SYNC'];
+    else process.env['AGENTEST_DISABLE_FRAMEWORK_SYNC'] = prevDisable;
   });
 
   it('attaches when the idling bridge ContentProvider exists', async () => {
     // Make sure other sync channels are neutralized for this test.
-    delete process.env['LAZYTEST_DISABLE_FRAMEWORK_SYNC'];
+    delete process.env['AGENTEST_DISABLE_FRAMEWORK_SYNC'];
 
     const shell = new MockShellExecutor();
     shell.when('content query', 'Row: 0 idle_count=0, idle_names=, version=1\n');
@@ -111,7 +111,7 @@ describe('FrameworkSync + idling bridge', () => {
   });
 
   it('hasBackend is false when no bridge is present and framework is native', async () => {
-    delete process.env['LAZYTEST_DISABLE_FRAMEWORK_SYNC'];
+    delete process.env['AGENTEST_DISABLE_FRAMEWORK_SYNC'];
 
     const shell = new MockShellExecutor();
     // content query throws → queryIdlingBridge returns null
@@ -127,8 +127,8 @@ describe('FrameworkSync + idling bridge', () => {
     sync.close();
   });
 
-  it('attach is a no-op when LAZYTEST_DISABLE_FRAMEWORK_SYNC=1', async () => {
-    process.env['LAZYTEST_DISABLE_FRAMEWORK_SYNC'] = '1';
+  it('attach is a no-op when AGENTEST_DISABLE_FRAMEWORK_SYNC=1', async () => {
+    process.env['AGENTEST_DISABLE_FRAMEWORK_SYNC'] = '1';
 
     const shell = new MockShellExecutor();
     // Register a bridge response that would attach if the env var were not set.
@@ -149,19 +149,19 @@ describe('FrameworkSync + idling bridge', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Stale-bridge warning: catches the "user updated LazyTest but forgot to
+// Stale-bridge warning: catches the "user updated AgenTest but forgot to
 // rebuild their Android app" case so Claude can tell them to rebuild.
 // ---------------------------------------------------------------------------
 
 describe('FrameworkSync.idlingBridgeWarning', () => {
-  const prevDisable = process.env['LAZYTEST_DISABLE_FRAMEWORK_SYNC'];
+  const prevDisable = process.env['AGENTEST_DISABLE_FRAMEWORK_SYNC'];
   afterAll(() => {
-    if (prevDisable === undefined) delete process.env['LAZYTEST_DISABLE_FRAMEWORK_SYNC'];
-    else process.env['LAZYTEST_DISABLE_FRAMEWORK_SYNC'] = prevDisable;
+    if (prevDisable === undefined) delete process.env['AGENTEST_DISABLE_FRAMEWORK_SYNC'];
+    else process.env['AGENTEST_DISABLE_FRAMEWORK_SYNC'] = prevDisable;
   });
 
   it('returns undefined when the bridge is absent', async () => {
-    delete process.env['LAZYTEST_DISABLE_FRAMEWORK_SYNC'];
+    delete process.env['AGENTEST_DISABLE_FRAMEWORK_SYNC'];
     const shell = new MockShellExecutor();
     const adb = new AdbClient(shell);
     const sync = new FrameworkSync({
@@ -175,7 +175,7 @@ describe('FrameworkSync.idlingBridgeWarning', () => {
   });
 
   it('returns undefined when the device bridge version matches the expected version', async () => {
-    delete process.env['LAZYTEST_DISABLE_FRAMEWORK_SYNC'];
+    delete process.env['AGENTEST_DISABLE_FRAMEWORK_SYNC'];
     const shell = new MockShellExecutor();
     shell.when('content query', 'Row: 0 idle_count=0, idle_names=, version=1\n');
     const adb = new AdbClient(shell);
@@ -190,7 +190,7 @@ describe('FrameworkSync.idlingBridgeWarning', () => {
   });
 
   it('returns an actionable rebuild command when the device bridge is older', async () => {
-    delete process.env['LAZYTEST_DISABLE_FRAMEWORK_SYNC'];
+    delete process.env['AGENTEST_DISABLE_FRAMEWORK_SYNC'];
     const shell = new MockShellExecutor();
     // Pretend the device has an older wire version than expected (1).
     // Version 0 is an impossible-in-practice value that stays < any future
@@ -214,9 +214,9 @@ describe('FrameworkSync.idlingBridgeWarning', () => {
 
   it('also warns when the device bridge is newer than expected', async () => {
     // Reverse scenario: user rebuilt their app with a dev/beta AAR that's
-    // ahead of the shipping LazyTest npm package. Still a mismatch worth
-    // flagging — the LLM should tell them to `npm update lazytest`.
-    delete process.env['LAZYTEST_DISABLE_FRAMEWORK_SYNC'];
+    // ahead of the shipping AgenTest npm package. Still a mismatch worth
+    // flagging — the LLM should tell them to `npm update agentest`.
+    delete process.env['AGENTEST_DISABLE_FRAMEWORK_SYNC'];
     const shell = new MockShellExecutor();
     shell.when('content query', 'Row: 0 idle_count=0, idle_names=, version=99\n');
     const adb = new AdbClient(shell);

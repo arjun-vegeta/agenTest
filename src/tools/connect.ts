@@ -29,7 +29,7 @@ export interface ConnectResult {
   /**
    * Which framework-sync channel(s) connected after helper/framework
    * detection. 'hermes' = React Native Hermes CDP via Metro; 'dart_vm' =
-   * Flutter VM Service; 'idling_bridge' = opt-in LazyTest AAR
+   * Flutter VM Service; 'idling_bridge' = opt-in AgenTest AAR
    * ContentProvider. Multiple can be present simultaneously (e.g., a
    * Flutter app that also installed the idling bridge). undefined = no
    * framework sync available. Either way, the helper's accessibility-event
@@ -38,7 +38,7 @@ export interface ConnectResult {
   frameworkSync?: ('hermes' | 'dart_vm' | 'idling_bridge')[];
   /**
    * Non-fatal warnings the LLM should surface to the developer. Currently
-   * used to flag a stale idling-bridge AAR — i.e. the user updated LazyTest
+   * used to flag a stale idling-bridge AAR — i.e. the user updated AgenTest
    * via npm but hasn't rebuilt their Android app so the device still ships
    * the old wire format. Each entry is a human-readable message that
    * includes an actionable command.
@@ -131,7 +131,7 @@ export async function handleConnect(
         }
         // backend='auto' — silent fallback to ADB
         console.error(
-          `[lazytest] gRPC connection failed on port ${grpcPort}, using ADB backend: ${err instanceof Error ? err.message : String(err)}`,
+          `[agentest] gRPC connection failed on port ${grpcPort}, using ADB backend: ${err instanceof Error ? err.message : String(err)}`,
         );
       }
     } else if (backend === 'grpc') {
@@ -147,7 +147,7 @@ export async function handleConnect(
   // If anything goes wrong we just degrade to the ADB+gRPC path with a log.
   const helper = await ensureHelper(shell, resolvedDeviceId).catch((err: unknown) => {
     console.error(
-      `[lazytest] helper install failed, continuing with ADB/gRPC: ${err instanceof Error ? err.message : String(err)}`,
+      `[agentest] helper install failed, continuing with ADB/gRPC: ${err instanceof Error ? err.message : String(err)}`,
     );
     return null;
   });
@@ -212,7 +212,7 @@ export async function handleConnect(
   // Release builds naturally skip this path: no Metro → no override →
   // framework stays whatever the helper reported.
   //
-  // Gated on `LAZYTEST_DISABLE_FRAMEWORK_SYNC=1` for two reasons:
+  // Gated on `AGENTEST_DISABLE_FRAMEWORK_SYNC=1` for two reasons:
   //   (a) the unit-test suite uses MockShellExecutor and doesn't expect
   //       any network calls — running fetch against localhost:8081 in
   //       tests is harmless (ECONNREFUSED in ~5ms) but creates spurious
@@ -222,7 +222,7 @@ export async function handleConnect(
   //       user has explicitly disabled framework sync, they don't want
   //       us probing Metro behind their back either.
   if (
-    process.env['LAZYTEST_DISABLE_FRAMEWORK_SYNC'] !== '1' &&
+    process.env['AGENTEST_DISABLE_FRAMEWORK_SYNC'] !== '1' &&
     framework !== 'react_native' &&
     framework !== 'flutter'
   ) {
@@ -256,8 +256,8 @@ export async function handleConnect(
         `[metro] discovery threw: ${err instanceof Error ? err.message : String(err)}`,
       );
     }
-  } else if (process.env['LAZYTEST_DISABLE_FRAMEWORK_SYNC'] === '1') {
-    diagnostics.push('[metro] skipped (LAZYTEST_DISABLE_FRAMEWORK_SYNC=1)');
+  } else if (process.env['AGENTEST_DISABLE_FRAMEWORK_SYNC'] === '1') {
+    diagnostics.push('[metro] skipped (AGENTEST_DISABLE_FRAMEWORK_SYNC=1)');
   } else {
     diagnostics.push(
       `[metro] skipped (helper already detected framework=${framework ?? 'undefined'})`,
@@ -267,7 +267,7 @@ export async function handleConnect(
   // Attach a framework sync backend if any sync channel is available:
   //   - Hermes CDP (React Native debug builds)
   //   - Dart VM Service (Flutter debug/profile builds)
-  //   - LazyTest Idling Bridge (any framework, opt-in AAR — Phase 3.10)
+  //   - AgenTest Idling Bridge (any framework, opt-in AAR — Phase 3.10)
   //
   // attach() is non-fatal for every channel. hasBackend is true iff at
   // least one of them attached successfully. Even when nothing attaches

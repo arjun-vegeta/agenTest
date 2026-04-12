@@ -6,7 +6,7 @@ import type { GrpcEmulatorClient } from './android/grpc-client.js';
 import type { HelperHandle } from './android/helper-installer.js';
 import { RefRegistry } from './android/ref-registry.js';
 import { LOGCAT, SERVER_NAME, SERVER_VERSION, TOOL_NAMES, TOOL_NAMES_EXT } from './constants.js';
-import { LazyTestError } from './errors.js';
+import { AgenTestError } from './errors.js';
 import { ProcessShellExecutor } from './shell.js';
 import { handleConnect } from './tools/connect.js';
 import { handleDeviceInfo } from './tools/device-info.js';
@@ -54,7 +54,7 @@ const server = new McpServer({
 });
 
 // ---------------------------------------------------------------------------
-// Tool: lazytest_connect
+// Tool: agentest_connect
 // ---------------------------------------------------------------------------
 
 server.tool(
@@ -142,7 +142,7 @@ Pass verbose:true to include framework-sync diagnostics.`,
 );
 
 // ---------------------------------------------------------------------------
-// Tool: lazytest_get_ui_tree
+// Tool: agentest_get_ui_tree
 // ---------------------------------------------------------------------------
 
 server.tool(
@@ -203,7 +203,7 @@ Options:
 );
 
 // ---------------------------------------------------------------------------
-// Tool: lazytest_run_flow
+// Tool: agentest_run_flow
 // ---------------------------------------------------------------------------
 
 server.tool(
@@ -250,7 +250,7 @@ SELECTORS: ref (fastest — from last snapshot), id (substring), text (exact), t
 );
 
 // ---------------------------------------------------------------------------
-// Tool: lazytest_reset_app
+// Tool: agentest_reset_app
 // ---------------------------------------------------------------------------
 
 server.tool(
@@ -271,7 +271,7 @@ server.tool(
             type: 'text',
             text: JSON.stringify({
               error:
-                'No package name provided and no app currently connected. Call lazytest_connect first.',
+                'No package name provided and no app currently connected. Call agentest_connect first.',
             }),
           },
         ],
@@ -311,7 +311,7 @@ server.tool(
 );
 
 // ---------------------------------------------------------------------------
-// Tool: lazytest_get_logs
+// Tool: agentest_get_logs
 // ---------------------------------------------------------------------------
 
 server.tool(
@@ -338,7 +338,7 @@ server.tool(
             type: 'text',
             text: JSON.stringify({
               error:
-                'No package name provided and no app currently connected. Call lazytest_connect first.',
+                'No package name provided and no app currently connected. Call agentest_connect first.',
             }),
           },
         ],
@@ -364,7 +364,7 @@ server.tool(
 );
 
 // ---------------------------------------------------------------------------
-// Tool: lazytest_screenshot
+// Tool: agentest_screenshot
 // ---------------------------------------------------------------------------
 
 server.tool(
@@ -389,7 +389,7 @@ server.tool(
 );
 
 // ---------------------------------------------------------------------------
-// Tool: lazytest_device_info
+// Tool: agentest_device_info
 // ---------------------------------------------------------------------------
 
 server.tool(
@@ -414,7 +414,7 @@ server.tool(
 );
 
 // ---------------------------------------------------------------------------
-// Tool: lazytest_get_shared_prefs
+// Tool: agentest_get_shared_prefs
 // ---------------------------------------------------------------------------
 
 server.tool(
@@ -436,7 +436,7 @@ server.tool(
             type: 'text',
             text: JSON.stringify({
               error:
-                'No package name provided and no app currently connected. Call lazytest_connect first.',
+                'No package name provided and no app currently connected. Call agentest_connect first.',
             }),
           },
         ],
@@ -462,7 +462,7 @@ server.tool(
 );
 
 // ---------------------------------------------------------------------------
-// Tool: lazytest_query_db
+// Tool: agentest_query_db
 // ---------------------------------------------------------------------------
 
 server.tool(
@@ -485,7 +485,7 @@ server.tool(
             type: 'text',
             text: JSON.stringify({
               error:
-                'No package name provided and no app currently connected. Call lazytest_connect first.',
+                'No package name provided and no app currently connected. Call agentest_connect first.',
             }),
           },
         ],
@@ -512,7 +512,7 @@ server.tool(
 );
 
 // ---------------------------------------------------------------------------
-// Tool: lazytest_set_network
+// Tool: agentest_set_network
 // ---------------------------------------------------------------------------
 
 server.tool(
@@ -562,7 +562,7 @@ Also: toggle wifi and airplaneMode explicitly.`,
 
 function formatError(err: unknown): { content: { type: 'text'; text: string }[] } {
   const message =
-    err instanceof LazyTestError
+    err instanceof AgenTestError
       ? { error: err.message, code: err.code }
       : { error: err instanceof Error ? err.message : String(err) };
 

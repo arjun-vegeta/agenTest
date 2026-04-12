@@ -46,11 +46,11 @@ describe('AdbClient helper lifecycle methods', () => {
 
   it('isPackageInstalled returns true when pm list contains exact match', async () => {
     const shell = new MockShellExecutor().when(
-      'pm list packages com.lazytest.helper',
-      'package:com.lazytest.helper\n',
+      'pm list packages com.agentest.helper',
+      'package:com.agentest.helper\n',
     );
     const adb = new AdbClient(shell);
-    expect(await adb.isPackageInstalled('com.lazytest.helper')).toBe(true);
+    expect(await adb.isPackageInstalled('com.agentest.helper')).toBe(true);
   });
 
   it('isPackageInstalled returns false when pm list is empty', async () => {
@@ -63,24 +63,24 @@ describe('AdbClient helper lifecycle methods', () => {
     // pm list with `com.example` filter would match com.example.thing too,
     // so isPackageInstalled needs to check for the exact line.
     const shell = new MockShellExecutor().when(
-      'pm list packages com.lazytest.helper',
-      'package:com.lazytest.helper.test\n',
+      'pm list packages com.agentest.helper',
+      'package:com.agentest.helper.test\n',
     );
     const adb = new AdbClient(shell);
     // Only the .test variant is present — main package is not installed.
-    expect(await adb.isPackageInstalled('com.lazytest.helper')).toBe(false);
+    expect(await adb.isPackageInstalled('com.agentest.helper')).toBe(false);
   });
 
   it('getPackageVersionCode parses dumpsys output', async () => {
     const dumpsys = `
 Packages:
-  Package [com.lazytest.helper] (12345):
+  Package [com.agentest.helper] (12345):
     versionCode=42 minSdk=24 targetSdk=34
     versionName=1.0.0
     `.trim();
-    const shell = new MockShellExecutor().when('dumpsys package com.lazytest.helper', dumpsys);
+    const shell = new MockShellExecutor().when('dumpsys package com.agentest.helper', dumpsys);
     const adb = new AdbClient(shell);
-    expect(await adb.getPackageVersionCode('com.lazytest.helper')).toBe(42);
+    expect(await adb.getPackageVersionCode('com.agentest.helper')).toBe(42);
   });
 
   it('getPackageVersionCode returns null when dumpsys fails', async () => {

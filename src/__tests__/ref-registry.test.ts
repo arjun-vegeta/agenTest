@@ -59,7 +59,7 @@ describe('RefRegistry', () => {
       const msg = err instanceof Error ? err.message : '';
       expect(msg).toContain('@b99');
       expect(msg).toContain('stale');
-      expect(msg).toContain('lazytest_get_ui_tree');
+      expect(msg).toContain('agentest_get_ui_tree');
     }
   });
 

@@ -3,7 +3,7 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <!--
-      Permissions for the LazyTest helper app.
+      Permissions for the AgenTest helper app.
 
       INTERNET / ACCESS_NETWORK_STATE: required for the embedded NanoHTTPD
       server (even though it only binds to 127.0.0.1).
@@ -28,7 +28,7 @@
 
     <application
         android:allowBackup="false"
-        android:label="LazyTest Helper"
+        android:label="AgenTest Helper"
         android:hasCode="true"
         tools:ignore="MissingApplicationIcon">
 

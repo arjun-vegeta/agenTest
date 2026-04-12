@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "com.lazytest.helper"
+    namespace = "com.agentest.helper"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.lazytest.helper"
+        applicationId = "com.agentest.helper"
         minSdk = 24
         targetSdk = 34
         // versionCode is bumped when the helper protocol or behavior changes;

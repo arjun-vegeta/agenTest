@@ -2,7 +2,7 @@
 <!--
   Real-world fixture from a Bolt/Lovable-style React Native app:
   ai.rumik.ira.twa (the "Ira" chat app). Captured live from the emulator
-  via lazytest_get_ui_tree on 2026-04-10.
+  via agentest_get_ui_tree on 2026-04-10.
 
   Critical properties for the target user:
   - Empty resource-ids on every node (RN doesn't auto-populate testID)

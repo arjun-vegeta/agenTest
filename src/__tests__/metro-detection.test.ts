@@ -1,6 +1,6 @@
 /**
  * Regression tests for Metro-first React Native detection in
- * `lazytest_connect`.
+ * `agentest_connect`.
  *
  * Background: against a real API 36 emulator running a React Native dev
  * build, both helper-side detection signals failed —
@@ -26,21 +26,21 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { handleConnect } from '../tools/connect.js';
 import { MockShellExecutor } from './mock-shell.js';
 
-const previousDisable = process.env['LAZYTEST_DISABLE_FRAMEWORK_SYNC'];
+const previousDisable = process.env['AGENTEST_DISABLE_FRAMEWORK_SYNC'];
 
 beforeEach(() => {
   // The Metro probe is gated on this env var (vitest.config sets it = '1'
   // for the rest of the suite). We unset it locally so the path under
   // test actually runs.
-  delete process.env['LAZYTEST_DISABLE_FRAMEWORK_SYNC'];
+  delete process.env['AGENTEST_DISABLE_FRAMEWORK_SYNC'];
 });
 
 afterEach(() => {
   vi.restoreAllMocks();
   if (previousDisable === undefined) {
-    delete process.env['LAZYTEST_DISABLE_FRAMEWORK_SYNC'];
+    delete process.env['AGENTEST_DISABLE_FRAMEWORK_SYNC'];
   } else {
-    process.env['LAZYTEST_DISABLE_FRAMEWORK_SYNC'] = previousDisable;
+    process.env['AGENTEST_DISABLE_FRAMEWORK_SYNC'] = previousDisable;
   }
 });
 
@@ -166,7 +166,7 @@ describe('Metro-first RN detection in handleConnect', () => {
     const result = await handleConnect(shell, 'com.example.nativeapp');
 
     // No matching target → framework stays whatever the helper said
-    // (undefined in test environment, since LAZYTEST_DISABLE_HELPER=1).
+    // (undefined in test environment, since AGENTEST_DISABLE_HELPER=1).
     expect(result.framework).not.toBe('react_native');
   });
 
@@ -179,8 +179,8 @@ describe('Metro-first RN detection in handleConnect', () => {
     expect(result.framework).not.toBe('react_native');
   });
 
-  it('does NOT probe Metro at all when LAZYTEST_DISABLE_FRAMEWORK_SYNC=1', async () => {
-    process.env['LAZYTEST_DISABLE_FRAMEWORK_SYNC'] = '1';
+  it('does NOT probe Metro at all when AGENTEST_DISABLE_FRAMEWORK_SYNC=1', async () => {
+    process.env['AGENTEST_DISABLE_FRAMEWORK_SYNC'] = '1';
 
     const fetchSpy = vi.fn().mockResolvedValue({
       ok: true,
@@ -241,13 +241,13 @@ describe('Metro-first RN detection in handleConnect', () => {
 
     expect(result.diagnostics).toBeDefined();
     const all = (result.diagnostics ?? []).join('\n');
-    // Helper isn't installed in tests (LAZYTEST_DISABLE_HELPER=1) so we
+    // Helper isn't installed in tests (AGENTEST_DISABLE_HELPER=1) so we
     // expect the "skipping helper-side detection" line.
     expect(all).toContain('[framework] helper not installed');
   });
 
-  it('surfaces a metro-skipped diagnostic when LAZYTEST_DISABLE_FRAMEWORK_SYNC=1', async () => {
-    process.env['LAZYTEST_DISABLE_FRAMEWORK_SYNC'] = '1';
+  it('surfaces a metro-skipped diagnostic when AGENTEST_DISABLE_FRAMEWORK_SYNC=1', async () => {
+    process.env['AGENTEST_DISABLE_FRAMEWORK_SYNC'] = '1';
     vi.stubGlobal('fetch', vi.fn());
 
     const shell = createNativeLookingShell();

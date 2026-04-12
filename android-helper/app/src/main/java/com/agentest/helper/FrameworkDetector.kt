@@ -1,4 +1,4 @@
-package com.lazytest.helper
+package com.agentest.helper
 
 import android.app.Instrumentation
 import android.content.pm.PackageManager
@@ -27,7 +27,7 @@ import java.io.File
  *   3. (Legacy fallback only) /proc/<pid>/maps for running processes, kept
  *      as a best-effort third signal on builds where it happens to work.
  *
- * Used by `lazytest_connect` so the LLM knows whether it's looking at
+ * Used by `agentest_connect` so the LLM knows whether it's looking at
  * React Native, Flutter, Compose, or classic Android Views — and can adjust
  * its element-targeting strategy accordingly (e.g. RN's testID maps to
  * resource-id, Flutter often has empty resource-ids, Compose needs

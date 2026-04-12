@@ -20,8 +20,8 @@
     -->
     <instrumentation
         android:name="androidx.test.runner.AndroidJUnitRunner"
-        android:targetPackage="com.lazytest.helper"
-        android:label="LazyTest Helper Server"
+        android:targetPackage="com.agentest.helper"
+        android:label="AgenTest Helper Server"
         android:handleProfiling="false"
         android:functionalTest="false" />
 

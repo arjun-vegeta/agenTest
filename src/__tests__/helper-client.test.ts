@@ -86,7 +86,7 @@ describe('HelperClient', () => {
         ? {
             body: {
               ok: true,
-              name: 'lazytest-helper',
+              name: 'agentest-helper',
               version: '1.0.0',
               protocolVersion: 1,
               sdkInt: 34,
@@ -115,7 +115,7 @@ describe('HelperClient', () => {
       return {
         body: {
           ok: true,
-          name: 'lazytest-helper',
+          name: 'agentest-helper',
           version: '1.0.0',
           protocolVersion: 1,
           sdkInt: 34,
@@ -137,7 +137,7 @@ describe('HelperClient', () => {
         ? {
             body: {
               ok: true,
-              name: 'lazytest-helper',
+              name: 'agentest-helper',
               version: '0.5.0',
               protocolVersion: 99,
               sdkInt: 34,

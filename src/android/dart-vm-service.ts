@@ -295,7 +295,7 @@ export async function connectDartVmServiceFor(
   if (!discovery) return undefined;
 
   // Set up adb forward host -> device. Best-effort cleanup first in case a
-  // previous lazytest session left a stale forward on this host port.
+  // previous agentest session left a stale forward on this host port.
   try {
     await adb.removeForward(hostPort);
   } catch {

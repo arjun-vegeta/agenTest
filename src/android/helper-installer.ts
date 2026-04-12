@@ -1,5 +1,5 @@
 /**
- * Auto-install + launch the LazyTest helper APK on first connect.
+ * Auto-install + launch the AgenTest helper APK on first connect.
  *
  * Zero user input required: the prebuilt APKs ship inside the npm package
  * (under android-helper/prebuilt/), and this module's `ensureHelper` function
@@ -50,12 +50,12 @@ interface PrebuiltApks {
  * Resolution order:
  *  1. Sibling android-helper/prebuilt/ relative to this source file (dev mode)
  *  2. android-helper/prebuilt/ relative to dist/ (production builds)
- *  3. LAZYTEST_HELPER_APK_DIR env var (test/CI escape hatch)
+ *  3. AGENTEST_HELPER_APK_DIR env var (test/CI escape hatch)
  *
  * Returns null if neither APK can be found — the caller falls back to ADB.
  */
 function findPrebuiltApks(): PrebuiltApks | null {
-  const envDir = process.env['LAZYTEST_HELPER_APK_DIR'];
+  const envDir = process.env['AGENTEST_HELPER_APK_DIR'];
   if (envDir) {
     // Env var is authoritative: use it or fail. This makes tests that point
     // at a nonexistent directory return null cleanly instead of accidentally
@@ -97,9 +97,9 @@ export async function ensureHelper(
   options: EnsureHelperOptions = {},
 ): Promise<HelperHandle | null> {
   // Test escape hatch: tests run against MockShellExecutor and can't install
-  // a real APK. They set LAZYTEST_DISABLE_HELPER=1 so this returns null and
+  // a real APK. They set AGENTEST_DISABLE_HELPER=1 so this returns null and
   // the rest of the connect flow falls back to the ADB+gRPC path.
-  if (process.env['LAZYTEST_DISABLE_HELPER'] === '1') {
+  if (process.env['AGENTEST_DISABLE_HELPER'] === '1') {
     return null;
   }
 
@@ -154,7 +154,7 @@ export async function ensureHelper(
     instrumentationProc.kill('SIGTERM');
     await adb.removeForward(HELPER.HOST_PORT);
     console.error(
-      `[lazytest] helper failed to start: ${err instanceof Error ? err.message : String(err)}`,
+      `[agentest] helper failed to start: ${err instanceof Error ? err.message : String(err)}`,
     );
     return null;
   }
@@ -235,7 +235,7 @@ function spawnInstrumentation(deviceId?: string): ChildProcess | null {
     });
   } catch (err) {
     console.error(
-      `[lazytest helper] failed to spawn am instrument: ${err instanceof Error ? err.message : String(err)}`,
+      `[agentest helper] failed to spawn am instrument: ${err instanceof Error ? err.message : String(err)}`,
     );
     return null;
   }
@@ -247,14 +247,14 @@ function spawnInstrumentation(deviceId?: string): ChildProcess | null {
     // them but we do log on stderr if the helper crashes.
     const text = chunk.toString();
     if (text.includes('INSTRUMENTATION_FAILED') || text.includes('Process crashed')) {
-      console.error(`[lazytest helper] ${text.trim()}`);
+      console.error(`[agentest helper] ${text.trim()}`);
     }
   });
   proc.stderr?.on('data', (chunk: Buffer) => {
-    console.error(`[lazytest helper] ${chunk.toString().trim()}`);
+    console.error(`[agentest helper] ${chunk.toString().trim()}`);
   });
   proc.on('error', (err) => {
-    console.error(`[lazytest helper] failed to spawn am instrument: ${err.message}`);
+    console.error(`[agentest helper] failed to spawn am instrument: ${err.message}`);
   });
 
   return proc;

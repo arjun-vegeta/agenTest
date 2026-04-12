@@ -1,10 +1,10 @@
-package com.lazytest.bridge
+package com.agentest.bridge
 
 /**
  * In-process registry of "things that must be idle before tests can proceed."
  *
- * The LazyTest helper queries this through `LazyTestIdlingProvider` via
- * `ContentResolver.query(content://<app-package>.lazytest.idling/state)`.
+ * The AgenTest helper queries this through `AgenTestIdlingProvider` via
+ * `ContentResolver.query(content://<app-package>.agentest.idling/state)`.
  * Everything in here runs on whatever thread the ContentProvider is called
  * on (usually a Binder thread), so the collection and `IdleSource`
  * implementations must be thread-safe.
@@ -12,7 +12,7 @@ package com.lazytest.bridge
  * Design notes:
  *   - Espresso's `IdlingRegistry` is the de-facto standard on Android, and
  *     we auto-bridge it reflectively: if the app already uses Espresso,
- *     every registered `IdlingResource` is visible to LazyTest with zero
+ *     every registered `IdlingResource` is visible to AgenTest with zero
  *     additional code.
  *   - Apps that DON'T use Espresso (or want to expose bespoke sources
  *     without depending on androidx.test) can register lightweight
@@ -21,14 +21,14 @@ package com.lazytest.bridge
  *     reflection path is caught and ignored so the bridge still works in
  *     apps with zero testing dependencies.
  */
-object LazyTestIdlingBridge {
+object AgenTestIdlingBridge {
 
     /**
      * Minimal idle-source interface. Implement this when you want to expose
      * an idle signal without depending on `androidx.test.espresso`.
      */
     interface IdleSource {
-        /** Short human-readable name — shown in LazyTest's busy report. */
+        /** Short human-readable name — shown in AgenTest's busy report. */
         val name: String
 
         /** True if this source has no outstanding work. */

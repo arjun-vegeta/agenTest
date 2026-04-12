@@ -1,16 +1,16 @@
-package com.lazytest.helper.test
+package com.agentest.helper.test
 
 import android.app.UiAutomation
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.Configurator
-import com.lazytest.helper.HelperServer
+import com.agentest.helper.HelperServer
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.util.concurrent.TimeUnit
 
 /**
- * Long-running entry point for the LazyTest helper.
+ * Long-running entry point for the AgenTest helper.
  *
  * This class is an instrumentation @Test method by name only — the JUnit
  * runner is being abused as a way to keep an Android process alive with
@@ -19,7 +19,7 @@ import java.util.concurrent.TimeUnit
  * The host MCP server launches us with:
  *
  *     adb shell am instrument -w -r \
- *         com.lazytest.helper.test/androidx.test.runner.AndroidJUnitRunner
+ *         com.agentest.helper.test/androidx.test.runner.AndroidJUnitRunner
  *
  * The -w flag makes adb wait for completion. We never complete (we block on
  * a CountDownLatch for up to MAX_RUNTIME_MS), so the host can keep talking
