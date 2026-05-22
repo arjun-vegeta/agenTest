@@ -19,7 +19,8 @@ import { handleResetApp } from './tools/reset-app.js';
 import { handleRunFlow } from './tools/run-flow.js';
 import { handleScreenshot } from './tools/screenshot.js';
 import { handleSetNetwork } from './tools/set-network.js';
-import { ActionStepSchema } from './types.js';
+import { ActionStepSchema, type Platform } from './types.js';
+import type { WdaRunner } from './ios/wda-runner.js';
 
 // ---------------------------------------------------------------------------
 // Shared state
@@ -45,6 +46,15 @@ let activeSync: FrameworkSync | undefined;
 /** Ref registry — maps @ref tokens to nodes across tool calls within a session */
 const activeRefRegistry = new RefRegistry();
 
+/** Tracks the active platform ('android' | 'ios') */
+let activePlatform: Platform | undefined;
+
+/** Tracks the active WDA runner process (iOS only) */
+let activeWdaRunner: WdaRunner | undefined;
+
+/** Tracks the active WDA port (iOS only) */
+let activeWdaPort: number | undefined;
+
 // ---------------------------------------------------------------------------
 // MCP Server
 // ---------------------------------------------------------------------------
@@ -60,7 +70,7 @@ const server = new McpServer({
 
 server.tool(
   TOOL_NAMES.CONNECT,
-  `Connect to an Android emulator/device and launch the app. Returns the initial UI screen in compact text format with @ref tokens you can use as selectors.
+  `Connect to an Android emulator/device or iOS Simulator and launch the app. Returns the initial UI screen in compact text format with @ref tokens you can use as selectors.
 
 The compact format uses one line per element:
   @b1 btn "Sign in"      — button, ref @b1
@@ -76,22 +86,26 @@ Traditional selectors (id/text/className/description) still work alongside refs.
 
 Pass verbose:true to include framework-sync diagnostics.`,
   {
-    packageName: z.string().describe('Android package name (e.g. "com.example.myapp")'),
+    packageName: z.string().describe('Android package name or iOS bundle ID (e.g. "com.example.myapp")'),
     deviceId: z
       .string()
       .optional()
       .describe(
-        'Specific device/emulator ID from "adb devices". Omit to use the first connected device.',
+        'Specific device/emulator ID or simulator UDID. Omit to auto-detect.',
       ),
     backend: z
       .enum(['auto', 'adb', 'grpc'])
       .optional()
       .describe(
-        'Input backend: "auto" (default) tries gRPC then falls back to ADB; "adb" forces ADB only; "grpc" requires gRPC (emulator only).',
+        'Input backend (Android-only): "auto" (default) tries gRPC then falls back to ADB; "adb" forces ADB only; "grpc" requires gRPC (emulator only).',
       ),
+    platform: z
+      .enum(['android', 'ios'])
+      .optional()
+      .describe('Target platform: "android" or "ios". Omit to auto-detect based on booted devices.'),
     verbose: z.boolean().optional().describe('Include framework-sync diagnostics in the response.'),
   },
-  async ({ packageName, deviceId, backend, verbose }) => {
+  async ({ packageName, deviceId, backend, platform, verbose }) => {
     try {
       const result = await handleConnect(
         shell,
@@ -102,12 +116,17 @@ Pass verbose:true to include framework-sync diagnostics.`,
         activeHelper,
         activeSync,
         activeRefRegistry,
+        platform,
+        activeWdaRunner,
       );
       activeDeviceId = result.deviceId;
       activePackageName = packageName;
       activeGrpcClient = result.grpcClient;
       activeHelper = result.helper;
       activeSync = result.sync;
+      activePlatform = result.platform;
+      activeWdaRunner = result.wdaRunner;
+      activeWdaPort = result.wdaPort;
 
       const anomalyDetected =
         result.framework === undefined ||
@@ -128,6 +147,7 @@ Pass verbose:true to include framework-sync diagnostics.`,
               screenFingerprint: result.screenFingerprint,
               warnings: result.warnings,
               diagnostics: includeDiagnostics ? result.diagnostics : undefined,
+              platform: result.platform,
             }),
           },
           {
@@ -186,6 +206,9 @@ Options:
         activeGrpcClient,
         activeHelper?.client,
         activeSync,
+        activePlatform,
+        activeWdaPort,
+        activePackageName,
       );
 
       if (result.format === 'full') {
