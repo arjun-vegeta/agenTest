@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseWdaJsonTree, XCUI_TO_ROLE } from '../ios/tree-parser.js';
+import { parseWdaJsonTree } from '../ios/tree-parser.js';
 import { UNIFIED_ROLES } from '../types.js';
 
 describe('parseWdaJsonTree', () => {
@@ -41,7 +41,9 @@ describe('parseWdaJsonTree', () => {
     expect(tree.children).toHaveLength(3);
 
     // Button
-    const btn = tree.children[0]!;
+    const btn = tree.children[0];
+    expect(btn).toBeDefined();
+    if (!btn) throw new Error('Expected button to exist');
     expect(btn.id).toBe('0.0');
     expect(btn.role).toBe(UNIFIED_ROLES.BUTTON);
     expect(btn.description).toBe('Log In');
@@ -52,7 +54,9 @@ describe('parseWdaJsonTree', () => {
     expect(btn.actions).toContain('tap');
 
     // Text field
-    const txt = tree.children[1]!;
+    const txt = tree.children[1];
+    expect(txt).toBeDefined();
+    if (!txt) throw new Error('Expected text field to exist');
     expect(txt.id).toBe('0.1');
     expect(txt.role).toBe(UNIFIED_ROLES.TEXT_FIELD);
     expect(txt.text).toBe('johndoe');
@@ -61,7 +65,9 @@ describe('parseWdaJsonTree', () => {
     expect(txt.actions).toContain('type');
 
     // Switch
-    const sw = tree.children[2]!;
+    const sw = tree.children[2];
+    expect(sw).toBeDefined();
+    if (!sw) throw new Error('Expected switch to exist');
     expect(sw.id).toBe('0.2');
     expect(sw.role).toBe(UNIFIED_ROLES.SWITCH);
     expect(sw.checked).toBe(true);

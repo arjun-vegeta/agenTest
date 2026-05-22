@@ -149,7 +149,10 @@ describe('SimctlClient app operations', () => {
   it('launches the application correctly after boot check', async () => {
     const { shell, simctl } = createMockSimctl('A1B2C3D4-E5F6-7A8B-9C0D-1E2F3A4B5C6D');
     shell.when('list devices --json', mockDevicesJson);
-    shell.when('launch A1B2C3D4-E5F6-7A8B-9C0D-1E2F3A4B5C6D com.example.app', 'com.example.app: 12345\n');
+    shell.when(
+      'launch A1B2C3D4-E5F6-7A8B-9C0D-1E2F3A4B5C6D com.example.app',
+      'com.example.app: 12345\n',
+    );
 
     await simctl.launchApp('com.example.app');
     const calls = shell.getCallsMatching('launch');

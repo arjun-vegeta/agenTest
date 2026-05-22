@@ -62,7 +62,7 @@ describe('WdaRunner', () => {
   describe('start & liveness', () => {
     it('succeeds immediately if checkLiveness returns true', async () => {
       const runner = new WdaRunner('some-udid', 8100);
-      
+
       const fetchMock = vi.spyOn(global, 'fetch').mockResolvedValue({
         ok: true,
         json: async () => ({ value: { state: 'success' } }),
@@ -74,7 +74,7 @@ describe('WdaRunner', () => {
 
     it('launches mock successfully', async () => {
       const runner = new WdaRunner('some-udid', 8101);
-      
+
       // First call false (not running), then mock start returns instantly in test mode
       vi.spyOn(runner, 'checkLiveness').mockResolvedValue(false);
 

@@ -8,7 +8,7 @@ import { discoverHermesTargets } from '../android/hermes-cdp.js';
 import { ensureHelper, type HelperHandle } from '../android/helper-installer.js';
 import type { RefRegistry } from '../android/ref-registry.js';
 import { GRPC } from '../constants.js';
-import { GrpcConnectionError, AgenTestError, SimctlConnectionError } from '../errors.js';
+import { GrpcConnectionError, AgenTestError } from '../errors.js';
 import type { ShellExecutor, Platform } from '../types.js';
 import { SimctlClient } from '../ios/simctl.js';
 import { WdaRunner } from '../ios/wda-runner.js';
