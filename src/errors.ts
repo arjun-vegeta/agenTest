@@ -117,5 +117,3 @@ export class WdaCommandError extends AgenTestError {
     this.name = 'WdaCommandError';
   }
 }
-
-

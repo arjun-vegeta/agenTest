@@ -40,10 +40,7 @@ export class WdaClient {
       });
 
       if (!res.ok) {
-        throw new WdaCommandError(
-          `WebDriverAgent command failed with status=${res.status}`,
-          url,
-        );
+        throw new WdaCommandError(`WebDriverAgent command failed with status=${res.status}`, url);
       }
 
       const data = (await res.json()) as { value?: T; error?: string; message?: string };
@@ -147,7 +144,7 @@ export class WdaClient {
   /**
    * Long press coordinates.
    */
-  async longPress(x: number, y: number, durationMs: number = 1000): Promise<void> {
+  async longPress(x: number, y: number, durationMs = 1000): Promise<void> {
     const sid = await this.ensureSession();
     // WDA touchAndHold duration is in seconds
     await this.request(`/session/${sid}/wda/touchAndHold`, 'POST', {
@@ -160,13 +157,7 @@ export class WdaClient {
   /**
    * Swipe / drag from one coordinate to another.
    */
-  async swipe(
-    x1: number,
-    y1: number,
-    x2: number,
-    y2: number,
-    durationMs: number = 300,
-  ): Promise<void> {
+  async swipe(x1: number, y1: number, x2: number, y2: number, durationMs = 300): Promise<void> {
     const sid = await this.ensureSession();
     // WDA expects: fromX, fromY, toX, toY, duration (seconds)
     await this.request(`/session/${sid}/wda/drag`, 'POST', {

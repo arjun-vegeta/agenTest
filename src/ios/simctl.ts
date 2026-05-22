@@ -79,9 +79,7 @@ export class SimctlClient {
   async assertDeviceConnected(): Promise<void> {
     const booted = await this.getBootedDevices();
     if (booted.length === 0) {
-      throw new SimctlConnectionError(
-        'No iOS Simulators currently booted. Run a simulator first.',
-      );
+      throw new SimctlConnectionError('No iOS Simulators currently booted. Run a simulator first.');
     }
     if (this.udid && !booted.includes(this.udid)) {
       throw new SimctlConnectionError(

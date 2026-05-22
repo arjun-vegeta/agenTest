@@ -49,7 +49,7 @@ export class WdaRunner {
   /**
    * Scan local ports starting from 8100 and return the first available one.
    */
-  static async findFreePort(startPort: number = 8100): Promise<number> {
+  static async findFreePort(startPort = 8100): Promise<number> {
     let port = startPort;
     while (!(await WdaRunner.isPortAvailable(port))) {
       port++;
@@ -116,11 +116,13 @@ export class WdaRunner {
   /**
    * Start WDA in the background and poll its status until it is ready.
    */
-  async start(startupTimeoutMs: number = 45000): Promise<void> {
+  async start(startupTimeoutMs = 45000): Promise<void> {
     // If WDA is already running and responds to status, reuse it!
     const alreadyRunning = await this.checkLiveness();
     if (alreadyRunning) {
-      console.error(`[agentest wda] WebDriverAgent is already running on port ${this.port}. Reusing.`);
+      console.error(
+        `[agentest wda] WebDriverAgent is already running on port ${this.port}. Reusing.`,
+      );
       return;
     }
 
@@ -140,8 +142,10 @@ export class WdaRunner {
       String(this.port),
     ];
 
-    console.error(`[agentest wda] Spawning xcodebuild test-without-building for destination=${this.udid} port=${this.port}`);
-    
+    console.error(
+      `[agentest wda] Spawning xcodebuild test-without-building for destination=${this.udid} port=${this.port}`,
+    );
+
     this.process = spawn('xcodebuild', args, {
       stdio: 'ignore',
       detached: false,
@@ -163,7 +167,9 @@ export class WdaRunner {
 
     while (Date.now() - startTime < startupTimeoutMs) {
       if (await this.checkLiveness()) {
-        console.error(`[agentest wda] WebDriverAgent is fully launched and listening on port ${this.port}.`);
+        console.error(
+          `[agentest wda] WebDriverAgent is fully launched and listening on port ${this.port}.`,
+        );
         return;
       }
 
@@ -185,12 +191,12 @@ export class WdaRunner {
     if (this.process) {
       const proc = this.process;
       this.process = null;
-      
+
       return new Promise<void>((resolveShutdown) => {
         proc.once('exit', () => {
           resolveShutdown();
         });
-        
+
         try {
           proc.kill('SIGTERM');
           // Fallback force kill after 2s

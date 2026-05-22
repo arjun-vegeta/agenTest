@@ -86,13 +86,13 @@ Traditional selectors (id/text/className/description) still work alongside refs.
 
 Pass verbose:true to include framework-sync diagnostics.`,
   {
-    packageName: z.string().describe('Android package name or iOS bundle ID (e.g. "com.example.myapp")'),
+    packageName: z
+      .string()
+      .describe('Android package name or iOS bundle ID (e.g. "com.example.myapp")'),
     deviceId: z
       .string()
       .optional()
-      .describe(
-        'Specific device/emulator ID or simulator UDID. Omit to auto-detect.',
-      ),
+      .describe('Specific device/emulator ID or simulator UDID. Omit to auto-detect.'),
     backend: z
       .enum(['auto', 'adb', 'grpc'])
       .optional()
@@ -102,7 +102,9 @@ Pass verbose:true to include framework-sync diagnostics.`,
     platform: z
       .enum(['android', 'ios'])
       .optional()
-      .describe('Target platform: "android" or "ios". Omit to auto-detect based on booted devices.'),
+      .describe(
+        'Target platform: "android" or "ios". Omit to auto-detect based on booted devices.',
+      ),
     verbose: z.boolean().optional().describe('Include framework-sync diagnostics in the response.'),
   },
   async ({ packageName, deviceId, backend, platform, verbose }) => {

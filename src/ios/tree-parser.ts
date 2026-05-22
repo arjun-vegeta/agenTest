@@ -1,4 +1,11 @@
-import { UNIFIED_ROLES, UNIFIED_ACTIONS, type UnifiedRole, type UnifiedUINode, type Bounds, type Point, type UnifiedAction } from '../types.js';
+import {
+  UNIFIED_ROLES,
+  UNIFIED_ACTIONS,
+  type UnifiedRole,
+  type UnifiedUINode,
+  type Bounds,
+  type UnifiedAction,
+} from '../types.js';
 import { TreeParseError } from '../errors.js';
 
 export interface WdaJsonNode {
@@ -49,7 +56,10 @@ function parseBoolean(val: unknown): boolean {
   return false;
 }
 
-export function parseWdaJsonTree(rawResponse: Record<string, unknown>, packageName: string = ''): UnifiedUINode {
+export function parseWdaJsonTree(
+  rawResponse: Record<string, unknown>,
+  packageName = '',
+): UnifiedUINode {
   // WDA source response can be nested inside a root object { value: ... } or just be the root node itself
   let root = rawResponse;
   if (rawResponse['value'] && typeof rawResponse['value'] === 'object') {
@@ -68,9 +78,14 @@ export function parseWdaJsonTree(rawResponse: Record<string, unknown>, packageNa
   return convertWdaNode(root as unknown as WdaJsonNode, '', 0, packageName);
 }
 
-function convertWdaNode(raw: WdaJsonNode, pathPrefix: string, index: number, packageName: string): UnifiedUINode {
+function convertWdaNode(
+  raw: WdaJsonNode,
+  pathPrefix: string,
+  index: number,
+  packageName: string,
+): UnifiedUINode {
   const id = pathPrefix ? `${pathPrefix}.${index}` : String(index);
-  
+
   const rect = raw.rect || { x: 0, y: 0, width: 0, height: 0 };
   const bounds: Bounds = {
     left: rect.x,
@@ -83,9 +98,9 @@ function convertWdaNode(raw: WdaJsonNode, pathPrefix: string, index: number, pac
   const role = XCUI_TO_ROLE[className] ?? UNIFIED_ROLES.CONTAINER;
 
   const enabled = raw.enabled !== undefined ? parseBoolean(raw.enabled) : true;
-  
+
   // clickability heuristics for iOS
-  const isClickableRole = 
+  const isClickableRole =
     role === UNIFIED_ROLES.BUTTON ||
     role === UNIFIED_ROLES.CHECK_BOX ||
     role === UNIFIED_ROLES.SWITCH ||
