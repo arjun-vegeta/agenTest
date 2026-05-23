@@ -6,11 +6,15 @@ import type { HelperClient } from '../android/helper-client.js';
 import { snapshotTree, waitForIdle } from '../android/idle.js';
 import { checkAssertion, executeAction, resolveTarget } from '../android/input.js';
 import type { RefRegistry } from '../android/ref-registry.js';
+import { WdaClient } from '../ios/wda-client.js';
+import { snapshotIosTree, waitForIosIdle } from '../ios/idle.js';
+import { detectIosSystemDialogs, executeIosAction } from '../ios/input.js';
 import type {
   ActionStep,
   Bounds,
   ElementSelector,
   FlowTrace,
+  Platform,
   ShellExecutor,
   StepResult,
   SystemDialog,
@@ -88,7 +92,17 @@ export async function handleRunFlow(
   helperClient?: HelperClient,
   frameworkSync?: FrameworkSync,
   registry?: RefRegistry,
+  platform?: Platform,
+  wdaPort?: number,
+  packageName?: string,
 ): Promise<FlowTrace> {
+  if (platform === 'ios') {
+    if (!wdaPort) {
+      throw new Error('wdaPort is required when platform is ios');
+    }
+    return handleIosRunFlow(new WdaClient(wdaPort), steps, packageName ?? '');
+  }
+
   const device = new DeviceClient(shell, deviceId, grpcClient, false, helperClient, frameworkSync);
   const results: StepResult[] = [];
   const detectedDialogs: SystemDialog[] = [];
@@ -329,4 +343,177 @@ export async function handleRunFlow(
     finalUiTree: screenChanged ? finalResult?.text : undefined,
     systemDialogs: detectedDialogs.length > 0 ? detectedDialogs : undefined,
   };
+}
+
+// ---------------------------------------------------------------------------
+// iOS run-flow implementation
+// ---------------------------------------------------------------------------
+
+/**
+ * Execute a batch of ActionSteps against an iOS Simulator via WDA.
+ * Mirrors the Android handleRunFlow structure but uses WdaClient for all
+ * device interaction. No gRPC, no helper APK, no frameworkSync.
+ */
+async function handleIosRunFlow(
+  client: WdaClient,
+  steps: ActionStep[],
+  packageName: string,
+): Promise<FlowTrace> {
+  const results: StepResult[] = [];
+  const detectedDialogs: SystemDialog[] = [];
+
+  const DEFAULT_IOS_SCREEN_BOUNDS: Bounds = {
+    left: 0,
+    top: 0,
+    right: 390,
+    bottom: 844,
+  };
+
+  // Get initial tree for screen bounds + context
+  let currentTree = await snapshotIosTree(client, packageName);
+  const screenBounds: Bounds =
+    currentTree.bounds.right > 0 ? currentTree.bounds : DEFAULT_IOS_SCREEN_BOUNDS;
+
+  const initialFingerprint = buildFingerprint(currentTree);
+
+  // Check for alerts on the initial screen
+  const initialDialogs = await detectIosSystemDialogs(client);
+  detectedDialogs.push(...initialDialogs);
+
+  for (let i = 0; i < steps.length; i++) {
+    const step = steps[i];
+    if (!step) continue;
+    const stepStart = Date.now();
+
+    try {
+      if (isAssertionStep(step)) {
+        currentTree = await snapshotIosTree(client, packageName);
+        const assertionResult = checkAssertion(currentTree, step);
+
+        results.push({
+          stepIndex: i,
+          action: step,
+          success: assertionResult.passed,
+          durationMs: Date.now() - stepStart,
+          error: assertionResult.passed ? undefined : assertionResult.message,
+        });
+
+        if (!assertionResult.passed) {
+          return {
+            success: false,
+            stepsCompleted: i,
+            totalSteps: steps.length,
+            results,
+            screenFingerprint: buildFingerprint(currentTree),
+            screenChanged: buildFingerprint(currentTree) !== initialFingerprint,
+            error: assertionResult.message,
+            systemDialogs: detectedDialogs.length > 0 ? detectedDialogs : undefined,
+          };
+        }
+      } else if (step.action === 'wait') {
+        await executeIosAction(client, currentTree, step, screenBounds, packageName);
+        currentTree = await snapshotIosTree(client, packageName);
+
+        results.push({
+          stepIndex: i,
+          action: step,
+          success: true,
+          durationMs: Date.now() - stepStart,
+        });
+      } else if (step.action === 'wait_for_stable') {
+        const timeout = step.timeoutMs;
+        const idleResult = await waitForIosIdle(client, packageName, { timeoutMs: timeout });
+        currentTree = idleResult.tree;
+
+        results.push({
+          stepIndex: i,
+          action: step,
+          success: true,
+          durationMs: Date.now() - stepStart,
+        });
+      } else if (isScrollToStep(step)) {
+        await executeIosAction(client, currentTree, step, screenBounds, packageName);
+        currentTree = await snapshotIosTree(client, packageName);
+
+        results.push({
+          stepIndex: i,
+          action: step,
+          success: true,
+          durationMs: Date.now() - stepStart,
+        });
+      } else {
+        // Heavy action — inject gesture then wait for idle
+        await executeIosAction(client, currentTree, step, screenBounds, packageName);
+        const idleResult = await waitForIosIdle(client, packageName);
+        currentTree = idleResult.tree;
+
+        // Check for system alerts after each action
+        const dialogs = await detectIosSystemDialogs(client);
+        detectedDialogs.push(...dialogs);
+
+        results.push({
+          stepIndex: i,
+          action: step,
+          success: true,
+          durationMs: Date.now() - stepStart,
+        });
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+
+      results.push({
+        stepIndex: i,
+        action: step,
+        success: false,
+        durationMs: Date.now() - stepStart,
+        error: errorMessage,
+      });
+
+      try {
+        currentTree = await snapshotIosTree(client, packageName);
+      } catch {
+        // Use stale tree if snapshot fails
+      }
+
+      return {
+        success: false,
+        stepsCompleted: i,
+        totalSteps: steps.length,
+        results,
+        screenFingerprint: buildFingerprint(currentTree),
+        screenChanged: buildFingerprint(currentTree) !== initialFingerprint,
+        error: `Step ${i} (${step.action}) failed: ${errorMessage}`,
+        systemDialogs: detectedDialogs.length > 0 ? detectedDialogs : undefined,
+      };
+    }
+  }
+
+  const finalFingerprint = buildFingerprint(currentTree);
+  const screenChanged = finalFingerprint !== initialFingerprint;
+
+  return {
+    success: true,
+    stepsCompleted: steps.length,
+    totalSteps: steps.length,
+    results,
+    screenFingerprint: finalFingerprint,
+    screenChanged,
+    systemDialogs: detectedDialogs.length > 0 ? detectedDialogs : undefined,
+  };
+}
+
+function buildFingerprint(tree: UnifiedUINode): string {
+  // Simple fingerprint: role+text of visible leaves — same idea as computeIdleFingerprint
+  const parts: string[] = [];
+  collectParts(tree, parts);
+  return parts.slice(0, 20).join('|');
+}
+
+function collectParts(node: UnifiedUINode, parts: string[]): void {
+  if (node.text) {
+    parts.push(`${node.role}:${node.text}`);
+  }
+  for (const child of node.children) {
+    collectParts(child, parts);
+  }
 }
