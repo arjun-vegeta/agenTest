@@ -560,3 +560,37 @@ export const KEYCODE_TO_W3C: Readonly<Record<string, string>> = {
   KEYCODE_PAGE_DOWN: 'PageDown',
   KEYCODE_POWER: 'Power',
 } as const;
+
+// ---------------------------------------------------------------------------
+// iOS / WebDriverAgent Constants
+// ---------------------------------------------------------------------------
+
+export const IOS_WDA = {
+  /** Default port WdaRunner scans from when looking for a free port. */
+  PORT_SCAN_START: 8100,
+  /** HTTP request timeout for WDA REST calls (ms). */
+  REQUEST_TIMEOUT_MS: 15_000,
+  /** Delay between individual taps during a triple-tap clear sequence (ms). */
+  TRIPLE_TAP_INTERVAL_MS: 80,
+  /** Settle delay after clear-text before the next action (ms). */
+  CLEAR_TEXT_SETTLE_MS: 100,
+  /** Settle delay after focusing a text field before typing (ms). */
+  KEYBOARD_SETTLE_MS: 300,
+} as const;
+
+/**
+ * WebDriver Unicode private-use key values sent to `/wda/keys`.
+ * Reference: https://www.w3.org/TR/webdriver/#keyboard-actions
+ */
+export const IOS_KEYCODES: Record<string, string> = {
+  BACKSPACE: '\ue003',
+  ENTER: '\ue007',
+  TAB: '\ue004',
+  ESCAPE: '\ue00c',
+  HOME: '\ue011',
+  END: '\ue010',
+  ARROW_UP: '\ue013',
+  ARROW_DOWN: '\ue015',
+  ARROW_LEFT: '\ue012',
+  ARROW_RIGHT: '\ue014',
+} as const;

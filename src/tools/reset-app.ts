@@ -4,7 +4,10 @@ import type { GrpcEmulatorClient } from '../android/grpc-client.js';
 import type { HelperClient } from '../android/helper-client.js';
 import { waitForIdle } from '../android/idle.js';
 import type { RefRegistry } from '../android/ref-registry.js';
-import type { ShellExecutor } from '../types.js';
+import { SimctlClient } from '../ios/simctl.js';
+import { WdaClient } from '../ios/wda-client.js';
+import { waitForIosIdle } from '../ios/idle.js';
+import type { Platform, ShellExecutor } from '../types.js';
 
 export interface ResetAppResult {
   packageName: string;
@@ -20,7 +23,16 @@ export async function handleResetApp(
   helperClient?: HelperClient,
   frameworkSync?: FrameworkSync,
   registry?: RefRegistry,
+  platform?: Platform,
+  wdaPort?: number,
 ): Promise<ResetAppResult> {
+  if (platform === 'ios') {
+    if (!wdaPort) {
+      throw new Error('wdaPort is required when platform is ios');
+    }
+    return handleIosResetApp(shell, packageName, deviceId, wdaPort, registry);
+  }
+
   const device = new DeviceClient(shell, deviceId, grpcClient, false, helperClient, frameworkSync);
 
   // Force stop the app
@@ -42,6 +54,35 @@ export async function handleResetApp(
 
   return {
     packageName,
+    screenFingerprint: compactResult?.fingerprint ?? '',
+    uiTree: compactResult?.text ?? '',
+  };
+}
+
+async function handleIosResetApp(
+  shell: ShellExecutor,
+  bundleId: string,
+  deviceId: string | undefined,
+  wdaPort: number,
+  registry?: RefRegistry,
+): Promise<ResetAppResult> {
+  const simctl = new SimctlClient(shell, deviceId);
+
+  // Terminate then relaunch
+  await simctl.terminateApp(bundleId);
+  await simctl.launchApp(bundleId);
+
+  const client = new WdaClient(wdaPort);
+
+  // Wait for UI to settle
+  const idleResult = await waitForIosIdle(client, bundleId);
+
+  // Rebuild registry with fresh tree
+  registry?.clear();
+  const compactResult = registry?.rebuild(idleResult.tree);
+
+  return {
+    packageName: bundleId,
     screenFingerprint: compactResult?.fingerprint ?? '',
     uiTree: compactResult?.text ?? '',
   };

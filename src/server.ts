@@ -264,6 +264,9 @@ SELECTORS: ref (fastest — from last snapshot), id (substring), text (exact), t
         activeHelper?.client,
         activeSync,
         activeRefRegistry,
+        activePlatform,
+        activeWdaPort,
+        activePackageName,
       );
 
       return {
@@ -313,6 +316,8 @@ server.tool(
         activeHelper?.client,
         activeSync,
         activeRefRegistry,
+        activePlatform,
+        activeWdaPort,
       );
 
       return {
