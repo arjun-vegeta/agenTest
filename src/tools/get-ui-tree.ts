@@ -5,7 +5,9 @@ import type { HelperClient } from '../android/helper-client.js';
 import { snapshotTree } from '../android/idle.js';
 import type { RefRegistry } from '../android/ref-registry.js';
 import { serializeTreeForLlm } from '../android/tree-parser.js';
-import type { LlmTreeNode, ShellExecutor } from '../types.js';
+import type { LlmTreeNode, ShellExecutor, Platform } from '../types.js';
+import { WdaClient } from '../ios/wda-client.js';
+import { parseWdaJsonTree } from '../ios/tree-parser.js';
 
 export type GetUiTreeFormat = 'compact' | 'full';
 
@@ -30,7 +32,39 @@ export async function handleGetUiTree(
   grpcClient?: GrpcEmulatorClient,
   helperClient?: HelperClient,
   frameworkSync?: FrameworkSync,
+  platform?: Platform,
+  wdaPort?: number,
+  packageName?: string,
 ): Promise<GetUiTreeResult> {
+  if (platform === 'ios' && wdaPort !== undefined) {
+    const client = new WdaClient(wdaPort);
+    const rawTree = await client.getSource();
+    const tree = parseWdaJsonTree(rawTree, packageName ?? '');
+
+    const format = opts?.format ?? 'compact';
+
+    if (format === 'full') {
+      const result = registry.rebuild(tree);
+      return {
+        format: 'full',
+        fingerprint: result.fingerprint,
+        uiTree: serializeTreeForLlm(tree),
+      };
+    }
+
+    const result = registry.rebuild(tree, {
+      maxDepth: opts?.depth,
+      onlyInteractive: opts?.onlyInteractive,
+    });
+
+    return {
+      format: 'compact',
+      fingerprint: result.fingerprint,
+      refCount: result.refCount,
+      uiTree: result.text,
+    };
+  }
+
   const device = new DeviceClient(shell, deviceId, grpcClient, false, helperClient, frameworkSync);
   const tree = await snapshotTree(device);
 

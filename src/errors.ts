@@ -101,3 +101,19 @@ export class SimctlCommandError extends AgenTestError {
   }
 }
 
+export class WdaConnectionError extends AgenTestError {
+  constructor(message: string) {
+    super(message, 'WDA_CONNECTION_ERROR');
+    this.name = 'WdaConnectionError';
+  }
+}
+
+export class WdaCommandError extends AgenTestError {
+  constructor(
+    message: string,
+    public readonly url: string,
+  ) {
+    super(message, 'WDA_COMMAND_ERROR');
+    this.name = 'WdaCommandError';
+  }
+}

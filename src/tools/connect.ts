@@ -1,6 +1,6 @@
 import { AdbClient } from '../android/adb.js';
 import { waitForIdle } from '../android/idle.js';
-import { DeviceClient, type ActiveBackend } from '../android/device-client.js';
+import { DeviceClient } from '../android/device-client.js';
 import { FrameworkSync, type FrameworkKind } from '../android/framework-sync.js';
 import { GrpcEmulatorClient } from '../android/grpc-client.js';
 import { discoverEmulatorToken } from '../android/grpc-discovery.js';
@@ -8,8 +8,12 @@ import { discoverHermesTargets } from '../android/hermes-cdp.js';
 import { ensureHelper, type HelperHandle } from '../android/helper-installer.js';
 import type { RefRegistry } from '../android/ref-registry.js';
 import { GRPC } from '../constants.js';
-import { GrpcConnectionError } from '../errors.js';
-import type { ShellExecutor } from '../types.js';
+import { GrpcConnectionError, AgenTestError } from '../errors.js';
+import type { ShellExecutor, Platform } from '../types.js';
+import { SimctlClient } from '../ios/simctl.js';
+import { WdaRunner } from '../ios/wda-runner.js';
+import { WdaClient } from '../ios/wda-client.js';
+import { parseWdaJsonTree } from '../ios/tree-parser.js';
 
 export type BackendOption = 'auto' | 'adb' | 'grpc';
 
@@ -21,7 +25,7 @@ export interface ConnectResult {
   /** 6-char screen fingerprint. */
   screenFingerprint: string;
   /** Which backend is active for input injection. */
-  backend: ActiveBackend;
+  backend: string;
   /** Whether the on-device helper APK is installed and serving. */
   helperInstalled: boolean;
   /** The framework detected for the launched app, if helper is available. */
@@ -66,6 +70,12 @@ export interface ConnectResult {
   helper?: HelperHandle;
   /** The framework sync handle, stored in server state for teardown later. */
   sync?: FrameworkSync;
+  /** The active platform */
+  platform?: Platform;
+  /** WDA runner process (iOS only) */
+  wdaRunner?: WdaRunner;
+  /** WDA port (iOS only) */
+  wdaPort?: number;
 }
 
 /**
@@ -77,7 +87,148 @@ function parseEmulatorPort(deviceId: string): number | null {
   return match ? Number(match[1]) : null;
 }
 
+export async function autoDetectPlatform(shell: ShellExecutor): Promise<Platform> {
+  let androidConnected = false;
+  let iosConnected = false;
+
+  try {
+    const adb = new AdbClient(shell);
+    const devices = await adb.getConnectedDevices();
+    androidConnected = devices.length > 0;
+  } catch {
+    // Ignore adb error
+  }
+
+  try {
+    const simctl = new SimctlClient(shell);
+    const booted = await simctl.getBootedDevices();
+    iosConnected = booted.length > 0;
+  } catch {
+    // Ignore simctl error
+  }
+
+  if (androidConnected && !iosConnected) {
+    return 'android';
+  }
+  if (iosConnected && !androidConnected) {
+    return 'ios';
+  }
+  if (androidConnected && iosConnected) {
+    throw new AgenTestError(
+      'Both Android and iOS active devices/simulators were detected. Please specify "platform": "android" or "platform": "ios" explicitly in the connection arguments.',
+      'PLATFORM_CONFLICT',
+    );
+  }
+  throw new AgenTestError(
+    'No active Android devices/emulators or iOS Simulators were detected. Please boot a device/simulator first.',
+    'NO_DEVICES_FOUND',
+  );
+}
+
 export async function handleConnect(
+  shell: ShellExecutor,
+  packageName: string,
+  deviceId?: string,
+  backend: BackendOption = 'auto',
+  existingGrpcClient?: GrpcEmulatorClient,
+  existingHelper?: HelperHandle,
+  existingSync?: FrameworkSync,
+  registry?: RefRegistry,
+  platform?: Platform,
+  existingWdaRunner?: WdaRunner,
+): Promise<ConnectResult> {
+  const resolvedPlatform = platform ?? (await autoDetectPlatform(shell));
+
+  if (resolvedPlatform === 'ios') {
+    // Tear down any active Android components
+    if (existingGrpcClient) {
+      existingGrpcClient.close();
+    }
+    if (existingHelper) {
+      await existingHelper.shutdown();
+    }
+    if (existingSync) {
+      existingSync.close();
+    }
+
+    return handleIosConnect(shell, packageName, deviceId, existingWdaRunner, registry);
+  }
+
+  // Tear down any active iOS components
+  if (existingWdaRunner) {
+    await existingWdaRunner.shutdown();
+  }
+
+  const androidRes = await handleAndroidConnect(
+    shell,
+    packageName,
+    deviceId,
+    backend,
+    existingGrpcClient,
+    existingHelper,
+    existingSync,
+    registry,
+  );
+
+  return {
+    ...androidRes,
+    platform: 'android',
+  };
+}
+
+export async function handleIosConnect(
+  shell: ShellExecutor,
+  bundleId: string,
+  deviceId?: string,
+  existingWdaRunner?: WdaRunner,
+  registry?: RefRegistry,
+): Promise<ConnectResult> {
+  if (existingWdaRunner) {
+    await existingWdaRunner.shutdown();
+  }
+
+  const simctl = new SimctlClient(shell, deviceId);
+  await simctl.assertDeviceConnected();
+
+  const bootedUdids = await simctl.getBootedDevices();
+  const resolvedDeviceId = deviceId ?? bootedUdids[0] ?? 'unknown';
+
+  // 1. Scan and find an open port starting from 8100
+  const wdaPort = await WdaRunner.findFreePort(8100);
+
+  // 2. Start WDA Runner on the free port
+  const runner = new WdaRunner(resolvedDeviceId, wdaPort);
+  await runner.start();
+
+  // 3. Setup WdaClient and create session
+  const client = new WdaClient(wdaPort);
+  await client.ensureSession();
+
+  // 4. Launch target app
+  await simctl.launchApp(bundleId);
+
+  // 5. Fetch raw tree and parse
+  const rawTree = await client.getSource();
+  const uiTree = parseWdaJsonTree(rawTree, bundleId);
+
+  // 6. Rebuild registry
+  registry?.clear();
+  const compactResult = registry?.rebuild(uiTree);
+
+  return {
+    deviceId: resolvedDeviceId,
+    packageName: bundleId,
+    uiTree: compactResult?.text ?? '',
+    screenFingerprint: compactResult?.fingerprint ?? '',
+    backend: 'wda',
+    helperInstalled: false,
+    platform: 'ios',
+    wdaRunner: runner,
+    wdaPort,
+  };
+}
+
+export async function handleAndroidConnect(
   shell: ShellExecutor,
   packageName: string,
   deviceId?: string,
@@ -192,35 +343,7 @@ export async function handleConnect(
     diagnostics.push('[framework] helper not installed, skipping helper-side detection');
   }
 
-  // Metro-first backstop: the helper's framework detection can miss RN
-  // apps in two common ways —
-  //   1. RN Fabric flattens React views into plain Android widgets, so
-  //      the a11y tree has no ReactViewGroup / RCTView class names to
-  //      walk. (Observed on API 36 emulators with recent RN builds.)
-  //   2. SELinux on newer Android builds blocks shell UID from reading
-  //      /proc/<pid>/maps for other apps, killing the lib-based signal.
-  //      (Permission denied on API 36 sdk_gphone64_arm64.)
-  //
-  // Metro's /json/list inspector-proxy endpoint is the most reliable
-  // positive signal we have: when Metro is running and has attached to
-  // the target app, it publishes a debug target with `appId` equal to
-  // the app's package name (plus a `reactNative` metadata block). If
-  // helper detection says "native" / undefined but Metro sees our
-  // package, we override here so `FrameworkSync` below will correctly
-  // open the Hermes CDP channel.
-  //
-  // Release builds naturally skip this path: no Metro → no override →
-  // framework stays whatever the helper reported.
-  //
-  // Gated on `AGENTEST_DISABLE_FRAMEWORK_SYNC=1` for two reasons:
-  //   (a) the unit-test suite uses MockShellExecutor and doesn't expect
-  //       any network calls — running fetch against localhost:8081 in
-  //       tests is harmless (ECONNREFUSED in ~5ms) but creates spurious
-  //       behavior on any dev machine that happens to have something
-  //       else listening on 8081;
-  //   (b) consistency with the rest of the framework-sync stack — if a
-  //       user has explicitly disabled framework sync, they don't want
-  //       us probing Metro behind their back either.
+  // Metro-first RN override
   if (
     process.env['AGENTEST_DISABLE_FRAMEWORK_SYNC'] !== '1' &&
     framework !== 'react_native' &&
@@ -264,14 +387,7 @@ export async function handleConnect(
     );
   }
 
-  // Attach a framework sync backend if any sync channel is available:
-  //   - Hermes CDP (React Native debug builds)
-  //   - Dart VM Service (Flutter debug/profile builds)
-  //   - AgenTest Idling Bridge (any framework, opt-in AAR — Phase 3.10)
-  //
-  // attach() is non-fatal for every channel. hasBackend is true iff at
-  // least one of them attached successfully. Even when nothing attaches
-  // we still pull the diagnostic trace out so the caller can see why.
+  // Attach a framework sync backend if any sync channel is available
   let frameworkSync: FrameworkSync | undefined;
   if (framework) {
     const sync = new FrameworkSync({
@@ -290,9 +406,7 @@ export async function handleConnect(
     diagnostics.push('[framework-sync] skipped (no framework detected)');
   }
 
-  // Rebuild the device client with the framework sync attached so that
-  // waitForIdle (and subsequent run_flow steps via the shared device in
-  // server.ts) will route through it.
+  // Rebuild the device client with the framework sync attached
   const deviceFull = new DeviceClient(
     shell,
     resolvedDeviceId,
@@ -302,44 +416,32 @@ export async function handleConnect(
     frameworkSync,
   );
 
-  // Wait for UI to settle. When a framework sync is attached, this call
-  // augments the helper's a11y-event idle with a JS/Dart-side idle probe.
+  // Wait for UI to settle
   const idleResult = await waitForIdle(deviceFull);
 
-  // Enumerate which sync channels actually attached so the LLM can surface
-  // them in the connect response. Each entry corresponds to a real probe
-  // that will run after the next `/wait-idle` — missing entries mean that
-  // channel was absent or degraded.
+  // Enumerate which sync channels actually attached
   const syncChannels: ('hermes' | 'dart_vm' | 'idling_bridge')[] = [];
   const warnings: string[] = [];
   if (frameworkSync) {
     if (frameworkSync.hasHermes) syncChannels.push('hermes');
     if (frameworkSync.hasDartVm) syncChannels.push('dart_vm');
     if (frameworkSync.hasIdlingBridge) syncChannels.push('idling_bridge');
-    // Stale-bridge detection: if the AAR baked into the user's app reports
-    // a different wire version than the host expects, emit a warning with
-    // a ready-to-paste rebuild command. The LLM relays it to the developer.
     if (frameworkSync.idlingBridgeWarning) {
       warnings.push(frameworkSync.idlingBridgeWarning);
     }
   }
 
-  // Fetch fiber labels if Hermes is attached (Phase 3.6). Silent no-op
-  // for non-RN apps or when Hermes is unavailable. The call appends
-  // further diagnostic lines to `frameworkSync.diagnostics`, so we
-  // re-snapshot them below before returning.
+  // Fetch fiber labels if Hermes is attached
   const diagnosticsBeforeFiber = frameworkSync ? frameworkSync.diagnostics.length : 0;
   const fiberLabels = frameworkSync
     ? await frameworkSync.snapshotFiberLabels(idleResult.tree)
     : new Map<string, string>();
   if (frameworkSync) {
-    // Pull any new [fiber] diagnostic lines added by the snapshot into
-    // the outgoing response.
     const newLines = frameworkSync.diagnostics.slice(diagnosticsBeforeFiber);
     diagnostics.push(...newLines);
   }
 
-  // Build registry from initial tree — produces compact text + fingerprint + refs
+  // Build registry from initial tree
   registry?.clear();
   const compactResult = registry?.rebuild(idleResult.tree, { externalLabels: fiberLabels });
 
